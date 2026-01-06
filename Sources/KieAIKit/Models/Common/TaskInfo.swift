@@ -44,7 +44,7 @@ public struct TaskInfo: Codable, Sendable {
     public let metadata: [String: String]?
 
     private enum CodingKeys: String, CodingKey {
-        case id
+        case id = "taskId"  // API uses camelCase "taskId"
         case status
         case contentType = "content_type"
         case model
