@@ -23,7 +23,8 @@
       "Bash(find:*)",
       "Bash(grep:*)",
       "WebSearch",
-      "Bash(git ls-remote:*)"
+      "Bash(git ls-remote:*)",
+      "Bash(curl:*)"
     ]
   }
 }

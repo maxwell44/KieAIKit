@@ -81,6 +81,7 @@ struct APIRequest<Body: Encodable> {
         if let body = body {
             let encoder = JSONEncoder()
             encoder.keyEncodingStrategy = .convertToSnakeCase
+            encoder.outputFormatting = .withoutEscapingSlashes
             request.httpBody = try encoder.encode(body)
         }
 
