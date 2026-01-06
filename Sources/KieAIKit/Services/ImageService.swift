@@ -38,39 +38,24 @@ public final class ImageService {
         model: KieModel,
         request: ImageGenerationRequest
     ) async throws -> TaskInfo {
-        struct JobRequestBody: Codable {
+        // Build the request body based on the model type
+        // Different models require different input structures
+        let inputDict = buildInputForModel(model, request: request)
+
+        // Create request using AnyCodable
+        struct DynamicBody: Encodable {
             let model: String
-            let input: ImageInput
+            let input: [String: AnyCodable]
 
-            struct ImageInput: Codable {
-                let prompt: String
-                let negativePrompt: String?
-                let count: Int?
-                let width: Int?
-                let height: Int?
-                let seed: Int?
-
-                enum CodingKeys: String, CodingKey {
-                    case prompt
-                    case negativePrompt = "negative_prompt"
-                    case count
-                    case width
-                    case height
-                    case seed
-                }
+            init(model: String, input: [String: Any]) {
+                self.model = model
+                self.input = input.mapValues { AnyCodable($0) }
             }
         }
 
-        let body = JobRequestBody(
+        let body = DynamicBody(
             model: model.rawValue,
-            input: JobRequestBody.ImageInput(
-                prompt: request.prompt,
-                negativePrompt: request.negativePrompt,
-                count: request.count,
-                width: request.width,
-                height: request.height,
-                seed: request.seed
-            )
+            input: inputDict
         )
 
         let apiRequest = APIRequest(
@@ -89,6 +74,52 @@ public final class ImageService {
         try taskInfo.validate()
 
         return taskInfo
+    }
+
+    /// Builds the input object for a specific model.
+    private func buildInputForModel(_ model: KieModel, request: ImageGenerationRequest) -> [String: Any] {
+        var input: [String: Any] = ["prompt": request.prompt]
+
+        switch model {
+        case .gptImage15:
+            // GPT Image requires aspect_ratio (string) and quality
+            if let width = request.width, let height = request.height {
+                // Convert width/height to aspect_ratio string
+                let gcd = greatestCommonDivisor(width, height)
+                input["aspect_ratio"] = "\(width/gcd):\(height/gcd)"
+            } else {
+                input["aspect_ratio"] = "1:1"  // Default
+            }
+            input["quality"] = "medium"  // Default quality
+
+        default:
+            // For other models, use the traditional width/height/negativePrompt fields
+            if let negativePrompt = request.negativePrompt {
+                input["negative_prompt"] = negativePrompt
+            }
+            if let count = request.count {
+                input["count"] = count
+            }
+            if let width = request.width {
+                input["width"] = width
+            }
+            if let height = request.height {
+                input["height"] = height
+            }
+            if let seed = request.seed {
+                input["seed"] = seed
+            }
+        }
+
+        return input
+    }
+
+    /// Helper function to calculate GCD for aspect ratio
+    private func greatestCommonDivisor(_ a: Int, _ b: Int) -> Int {
+        let a = abs(a)
+        let b = abs(b)
+        if b == 0 { return a }
+        return greatestCommonDivisor(b, a % b)
     }
 
     /// Waits for an image generation task to complete and returns the result.
