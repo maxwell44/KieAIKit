@@ -11,6 +11,7 @@ A type-safe, modern Swift SDK for interacting with the Kie.ai REST API. KieAIKit
 - **Async/Await**: Modern Swift concurrency with async/await throughout
 - **Task Polling**: Built-in polling mechanism for asynchronous generation tasks
 - **Clean API**: Simple, expressive API that hides the complexity of HTTP and JSON
+- **Debug Support**: Built-in request/response logging in DEBUG mode
 - **No Dependencies**: Built on Foundation only - no third-party networking libraries
 - **iOS & macOS**: Supports iOS 15+ and macOS 13+
 
@@ -21,7 +22,7 @@ A type-safe, modern Swift SDK for interacting with the Kie.ai REST API. KieAIKit
 Add KieAIKit to your project in Xcode:
 
 1. File → Add Package Dependencies
-2. Enter the repository URL: `https://github.com/your-username/KieAIKit`
+2. Enter the repository URL: `https://github.com/maxwell44/KieAIKit`
 3. Select the version rules
 4. Add KieAIKit to your app target
 
@@ -29,7 +30,7 @@ Or manually add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/your-username/KieAIKit", from: "1.0.0")
+    .package(url: "https://github.com/maxwell44/KieAIKit", from: "1.0.0")
 ]
 ```
 
@@ -61,16 +62,6 @@ do {
 
     print("Image URL: \(result.primaryImageURL!)")
 
-    // Or with more control
-    let request = ImageGenerationRequest.with(
-        prompt: "A serene mountain landscape",
-        size: .landscape,
-        negativePrompt: "blurry, low quality"
-    )
-
-    let task = try await client.image.generate(model: .seedream45, request: request)
-    let detailedResult = try await client.image.waitForResult(task: task)
-
 } catch {
     print("Error: \(error)")
 }
@@ -93,23 +84,6 @@ do {
 }
 ```
 
-#### Audio Generation
-
-```swift
-do {
-    let result = try await client.generateAudio(
-        model: .seedance15Pro,
-        prompt: "Epic orchestral music with dramatic crescendos",
-        duration: 30.0
-    )
-
-    print("Audio URL: \(result.audioURL)")
-
-} catch {
-    print("Error: \(error)")
-}
-```
-
 ## Advanced Usage
 
 ### Custom Configuration
@@ -126,17 +100,17 @@ let client = KieAIClient(configuration: config)
 
 ### Available Models
 
+⚠️ **Important**: Model names must match exactly what's listed in the [KIE Market](https://docs.kie.ai/market). Do NOT use model names from official sources (OpenAI, Anthropic, etc.) as KIE uses its own naming convention.
+
+#### Verified Models
+
 ```swift
 // Image Models
-KieModel.gptImage15      // GPT Image 1.5
-KieModel.seedream45      // Seedream 4.5
-KieModel.flux2           // Flux 2
-KieModel.zImage          // Z-Image
+KieModel.gptImage15      // "gpt-image/1.5-text-to-image"
+KieModel.flux2Flex       // "flux-2/flex-text-to-image"
 
 // Video Models
-KieModel.kling26         // Kling 2.6
-KieModel.wan26           // Wan 2.6
-KieModel.seedance15Pro   // Seedance 1.5 Pro
+KieModel.kling26         // "kling-2.6/text-to-video"
 ```
 
 ### Detailed Request Configuration
@@ -151,24 +125,54 @@ let request = ImageGenerationRequest(
     seed: 42
 )
 
-let task = try await client.image.generate(model: .flux2, request: request)
+let task = try await client.image.generate(model: .flux2Flex, request: request)
 let result = try await client.image.waitForResult(task: task, timeout: 300.0)
 ```
 
-### Video with Custom Settings
+### Model-Specific Input Formats
+
+Different models may require different input formats. The SDK handles this automatically:
+
+- **GPT Image 1.5**: Requires `aspect_ratio` (string) and `quality` (string)
+- **Flux-2**: Requires `aspect_ratio` (string) and `resolution` (string)
 
 ```swift
-let request = VideoGenerationRequest(
-    prompt: "A serene beach at sunset",
-    duration: 10,
-    aspectRatio: .cinematic,
-    fps: 30,
-    seed: 100
+// GPT Image example
+let result1 = try await client.generateImage(
+    model: .gptImage15,
+    prompt: "A beautiful landscape",
+    width: 1024,
+    height: 1024
 )
 
-let task = try await client.video.generate(model: .wan26, request: request)
-let result = try await client.video.waitForResult(task: task)
+// Flux-2 example
+let result2 = try await client.generateImage(
+    model: .flux2Flex,
+    prompt: "A portrait of a cat",
+    width: 1024,
+    height: 1024
+)
 ```
+
+## Debugging
+
+In DEBUG mode, the SDK automatically logs:
+
+1. **Request URL** - The full API endpoint being called
+2. **Request Body** - The JSON payload being sent
+3. **Raw Response** - The raw JSON response from the API
+
+Example debug output:
+```
+🔍 KieAIKit URL: https://api.kie.ai/api/v1/jobs/createTask
+🔍 KieAIKit Request Body: {"model":"flux-2/flex-text-to-image","input":{...}}
+🧾 KieAIKit Raw Response: {"code":200,"msg":"success","data":{...}}
+```
+
+This helps identify issues with:
+- Incorrect model names
+- Missing required fields
+- API response format changes
 
 ## API Structure
 
@@ -196,11 +200,20 @@ do {
         print("Task failed: \(message)")
     case .rateLimited:
         print("Rate limit exceeded")
+    case .serverError(let message):
+        print("Server error: \(message)")
     default:
         print("Error: \(error.localizedDescription)")
     }
 }
 ```
+
+Common error codes:
+- `401` - Unauthorized (invalid API key)
+- `402` - Insufficient credits
+- `404` - Resource not found (check model name)
+- `422` - Validation error (check request parameters)
+- `429` - Rate limit exceeded
 
 ## Security
 
@@ -232,7 +245,14 @@ This is an unofficial SDK and is not affiliated with, endorsed by, or sponsored 
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit pull requests or open issues.
+Contributions are welcome! When adding new models:
+
+1. **Verify the exact model name** from [KIE Market](https://docs.kie.ai/market)
+2. **Check the required input format** in the model's documentation
+3. **Add model-specific input handling** in `ImageService.buildInputForModel()` if needed
+4. **Test with actual API calls** to ensure correctness
+
+Please feel free to submit pull requests or open issues.
 
 ## Support
 
