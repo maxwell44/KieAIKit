@@ -66,6 +66,6 @@ public struct TaskCreationResponse: Codable, Sendable {
     public let taskId: String
 
     private enum CodingKeys: String, CodingKey {
-        case taskId = "task_id"
+        case taskId  // API uses camelCase "taskId"
     }
 }
