@@ -59,16 +59,29 @@ struct APIRequest<Body: Encodable> {
             throw APIError.invalidURL(baseURL)
         }
 
-        var components = URLComponents(url: url.appendingPathComponent(path), resolvingAgainstBaseURL: false)
+        // Construct URL manually to handle multi-segment paths correctly
+        let baseString = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
+        let pathString = path.hasPrefix("/") ? String(path.dropFirst()) : path
+        let fullURLString = "\(baseString)/\(pathString)"
+
+        #if DEBUG
+        print("🔍 KieAIKit URL: \(fullURLString)")
+        #endif
+
+        guard let finalURL = URL(string: fullURLString) else {
+            throw APIError.invalidURL(path)
+        }
+
+        var components = URLComponents(url: finalURL, resolvingAgainstBaseURL: false)
         if !queryItems.isEmpty {
             components?.queryItems = queryItems
         }
 
-        guard let finalURL = components?.url else {
+        guard let requestURL = components?.url else {
             throw APIError.invalidURL(path)
         }
 
-        var request = URLRequest(url: finalURL)
+        var request = URLRequest(url: requestURL)
         request.httpMethod = method.rawValue
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
