@@ -107,7 +107,7 @@ public final class ImageService {
         // Poll until complete, result contains the final task status
         let finalTaskInfo = try await poller.poll(
             taskId: task.id,
-            endpoint: "jobs/getTaskStatus",
+            endpoint: "jobs/recordInfo?taskId",
             interval: interval,
             timeout: timeout
         )

@@ -29,7 +29,7 @@ final class TaskPoller {
     ///
     /// - Parameters:
     ///   - taskId: The ID of the task to poll
-    ///   - endpoint: The endpoint path for polling (e.g., "tasks/status")
+    ///   - endpoint: The endpoint path for polling (e.g., "jobs/recordInfo?taskId")
     ///   - interval: Seconds between polling attempts (default: 2)
     ///   - timeout: Maximum time to wait before timing out (default: 300 seconds / 5 minutes)
     /// - Returns: The final task info
@@ -47,8 +47,16 @@ final class TaskPoller {
             attempts += 1
 
             do {
+                // Build the path - if endpoint contains ?, append taskId as query param
+                let path: String
+                if endpoint.contains("?") {
+                    path = "\(endpoint)=\(taskId)"
+                } else {
+                    path = "\(endpoint)/\(taskId)"
+                }
+
                 let request = APIRequest<EmptyRequestBody>(
-                    path: "\(endpoint)/\(taskId)",
+                    path: path,
                     method: .get
                 )
 

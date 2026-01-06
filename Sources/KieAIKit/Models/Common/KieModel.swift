@@ -12,33 +12,45 @@ import Foundation
 /// This enum provides type safety when specifying which model to use for generation.
 /// Do not use arbitrary strings - always use these predefined cases.
 ///
-/// Model names follow the Kie.ai naming convention (e.g., "gpt-image-1.5", "kling/v2-1-pro")
+/// ⚠️ IMPORTANT: Model names must match exactly what's listed in the KIE Market.
+/// https://docs.kie.ai/cn/market
+///
+/// Do NOT use model names from OpenAI, Anthropic, or other official sources.
+/// KIE uses its own model naming convention.
 public enum KieModel: String, Codable, Sendable {
 
     // MARK: - Image Generation Models
 
     /// GPT Image 1.5 - Advanced text-to-image generation
-    case gptImage15 = "gpt-image-1.5"
+    /// Model identifier: "gpt-image/1.5-text-to-image"
+    /// Documentation: https://docs.kie.ai/cn/market/gpt-image
+    case gptImage15 = "gpt-image/1.5-text-to-image"
 
     /// Seedream 4.5 - High-quality image synthesis
+    /// Documentation: https://docs.kie.ai/cn/market/seedream
     case seedream45 = "seedream-4.5"
 
     /// Flux 2 - Fast image generation model
+    /// Documentation: https://docs.kie.ai/cn/market/flux-2
     case flux2 = "flux-2"
 
     /// Z-Image - Specialized image generation
+    /// Documentation: https://docs.kie.ai/cn/market/z-image
     case zImage = "z-image"
 
     // MARK: - Video Generation Models
 
-    /// Kling V2.1 Pro - Advanced video generation
-    /// Model identifier: "kling/v2-1-pro"
-    case klingV21Pro = "kling/v2-1-pro"
+    /// Kling 2.6 - Advanced video generation (text-to-video)
+    /// Model identifier: "kling-2.6/text-to-video"
+    /// Documentation: https://docs.kie.ai/cn/market/kling
+    case kling26 = "kling-2.6/text-to-video"
 
     /// Wan 2.6 - High-quality video synthesis
+    /// Documentation: https://docs.kie.ai/cn/market/wan
     case wan26 = "wan-2.6"
 
     /// Seedance 1.5 Pro - Professional dance and motion video generation
+    /// Documentation: https://docs.kie.ai/cn/market/seedance
     case seedance15Pro = "seedance-1.5-pro"
 
     // MARK: - Audio Generation Models
@@ -54,7 +66,7 @@ public enum KieModel: String, Codable, Sendable {
 
     /// Returns all video generation models.
     public static var allVideoModels: [KieModel] {
-        return [.klingV21Pro, .wan26, .seedance15Pro]
+        return [.kling26, .wan26, .seedance15Pro]
     }
 
     /// Returns all audio generation models.
