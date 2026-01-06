@@ -44,7 +44,18 @@ public final class ImageService {
 
         // Debug: Print the request body
         #if DEBUG
-        if let jsonData = try? JSONSerialization.data(withJSONObject: ["model": model.rawValue, "input": inputDict], options: .prettyPrinted),
+        struct DebugBody: Encodable {
+            let model: String
+            let input: [String: AnyCodable]
+            init(model: String, input: [String: Any]) {
+                self.model = model
+                self.input = input.mapValues { AnyCodable($0) }
+            }
+        }
+        let debugBody = DebugBody(model: model.rawValue, input: inputDict)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .withoutEscapingSlashes
+        if let jsonData = try? encoder.encode(debugBody),
            let jsonString = String(data: jsonData, encoding: .utf8) {
             print("🔍 KieAIKit Request Body:")
             print(jsonString)
