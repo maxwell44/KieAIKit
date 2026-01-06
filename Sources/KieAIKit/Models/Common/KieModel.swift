@@ -44,11 +44,6 @@ public enum KieModel: String, Codable, Sendable {
     // Uncomment when audio models are documented:
     // case audioModel1 = "audio-model-1"
 
-    /// The raw string value of the model.
-    public var rawValue: String {
-        return self.rawValue
-    }
-
     /// Returns all image generation models.
     public static var allImageModels: [KieModel] {
         return [.gptImage15, .seedream45, .flux2, .zImage]

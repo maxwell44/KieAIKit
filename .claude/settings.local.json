@@ -15,7 +15,10 @@
       "Bash(xcrun simctl install:*)",
       "Bash(xcrun simctl launch:*)",
       "Bash(echo:*)",
-      "Bash(log show:*)"
+      "Bash(log show:*)",
+      "Bash(cat:*)",
+      "Bash(xcrun simctl spawn:*)",
+      "Bash(timeout:*)"
     ]
   }
 }
