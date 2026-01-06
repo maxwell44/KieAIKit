@@ -78,7 +78,12 @@ public final class ImageService {
         )
 
         // The API returns a task info with the task ID
-        return try await apiClient.perform(apiRequest, as: TaskInfo.self)
+        let taskInfo = try await apiClient.perform(apiRequest, as: TaskInfo.self)
+
+        // Validate the task info before returning
+        try taskInfo.validate()
+
+        return taskInfo
     }
 
     /// Waits for an image generation task to complete and returns the result.

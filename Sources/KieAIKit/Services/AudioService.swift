@@ -71,7 +71,12 @@ public final class AudioService {
             body: body
         )
 
-        return try await apiClient.perform(apiRequest, as: TaskInfo.self)
+        let taskInfo = try await apiClient.perform(apiRequest, as: TaskInfo.self)
+
+        // Validate the task info before returning
+        try taskInfo.validate()
+
+        return taskInfo
     }
 
     /// Waits for an audio generation task to complete and returns the result.

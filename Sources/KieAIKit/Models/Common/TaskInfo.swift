@@ -82,6 +82,19 @@ public struct TaskInfo: Codable, Sendable {
         self.resultURL = resultURL
         self.metadata = metadata
     }
+
+    /// Validates that the task info is valid for polling.
+    /// - Throws: APIError if the task info is invalid
+    public func validate() throws {
+        guard !id.isEmpty else {
+            throw APIError.badRequest("Invalid task ID: task ID is empty")
+        }
+
+        // Check if the task immediately failed
+        if status == .failed, let message = errorMessage {
+            throw APIError.taskFailed(message)
+        }
+    }
 }
 
 /// The type of content being generated.

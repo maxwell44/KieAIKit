@@ -13,7 +13,9 @@
       "Bash(xcrun simctl boot:*)",
       "Bash(open:*)",
       "Bash(xcrun simctl install:*)",
-      "Bash(xcrun simctl launch:*)"
+      "Bash(xcrun simctl launch:*)",
+      "Bash(echo:*)",
+      "Bash(log show:*)"
     ]
   }
 }

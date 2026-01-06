@@ -80,7 +80,12 @@ public final class VideoService {
             body: body
         )
 
-        return try await apiClient.perform(apiRequest, as: TaskInfo.self)
+        let taskInfo = try await apiClient.perform(apiRequest, as: TaskInfo.self)
+
+        // Validate the task info before returning
+        try taskInfo.validate()
+
+        return taskInfo
     }
 
     /// Waits for a video generation task to complete and returns the result.

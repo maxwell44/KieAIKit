@@ -16,6 +16,9 @@ final class TaskPoller {
     /// Default interval between polling attempts.
     private let defaultInterval: TimeInterval = 2.0
 
+    /// Maximum number of polling attempts (prevents infinite loops)
+    private let maxAttempts: Int = 10
+
     /// Creates a new task poller.
     /// - Parameter apiClient: The API client to use for polling
     init(apiClient: APIClient) {
@@ -38,8 +41,11 @@ final class TaskPoller {
         timeout: TimeInterval = 300.0
     ) async throws -> TaskInfo {
         let startTime = Date()
+        var attempts = 0
 
-        while Date().timeIntervalSince(startTime) < timeout {
+        while Date().timeIntervalSince(startTime) < timeout && attempts < maxAttempts {
+            attempts += 1
+
             do {
                 let request = APIRequest<EmptyRequestBody>(
                     path: "\(endpoint)/\(taskId)",
@@ -66,6 +72,9 @@ final class TaskPoller {
 
                 let taskInfo = try decoder.decode(TaskInfo.self, from: data)
 
+                // Validate the task info
+                try taskInfo.validate()
+
                 if taskInfo.status.isTerminal {
                     if taskInfo.status.isSuccess {
                         return taskInfo
@@ -83,16 +92,36 @@ final class TaskPoller {
                 switch apiError {
                 case .notFound, .unauthorized, .badRequest, .timeout:
                     throw apiError
-                case .requestFailed, .serverError, .rateLimited:
-                    // For these, continue polling
+                case .requestFailed(let code, _):
+                    // For 5xx errors, continue polling (with max attempts limit)
+                    if code >= 500 {
+                        if attempts >= maxAttempts {
+                            throw APIError.serverError("Max retry attempts (\(maxAttempts)) reached")
+                        }
+                        try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                    } else {
+                        throw apiError
+                    }
+                case .serverError, .rateLimited:
+                    // For these, continue polling (with max attempts limit)
+                    if attempts >= maxAttempts {
+                        throw apiError
+                    }
                     try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
                 default:
                     throw apiError
                 }
             } catch {
-                // For decoding and other errors, continue polling
+                // For decoding and other errors, continue polling (with max attempts limit)
+                if attempts >= maxAttempts {
+                    throw APIError.decodingFailed(error)
+                }
                 try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
             }
+        }
+
+        if attempts >= maxAttempts {
+            throw APIError.timeout
         }
 
         throw APIError.timeout
