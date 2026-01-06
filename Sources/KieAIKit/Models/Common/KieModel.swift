@@ -13,65 +13,40 @@ import Foundation
 /// Do not use arbitrary strings - always use these predefined cases.
 ///
 /// ⚠️ IMPORTANT: Model names must match exactly what's listed in the KIE Market.
-/// https://docs.kie.ai/cn/market
+/// https://docs.kie.ai/market
 ///
 /// Do NOT use model names from OpenAI, Anthropic, or other official sources.
 /// KIE uses its own model naming convention.
+///
+/// To add new models, visit https://docs.kie.ai/market to find the exact model identifier.
 public enum KieModel: String, Codable, Sendable {
 
-    // MARK: - Image Generation Models
+    // MARK: - Verified Models
 
-    /// GPT Image 1.5 - Advanced text-to-image generation
+    /// GPT Image 1.5 - Text-to-image generation
     /// Model identifier: "gpt-image/1.5-text-to-image"
-    /// Documentation: https://docs.kie.ai/cn/market/gpt-image
+    /// Documentation: https://docs.kie.ai/market/gpt-image
     case gptImage15 = "gpt-image/1.5-text-to-image"
 
-    /// Seedream 4.5 - High-quality image synthesis
-    /// Documentation: https://docs.kie.ai/cn/market/seedream
-    case seedream45 = "seedream-4.5"
+    /// Flux 2 - Text-to-image generation
+    /// Model identifier: "flux-2/flex-text-to-image"
+    /// Documentation: https://docs.kie.ai/market/flux2/flex-text-to-image
+    case flux2Flex = "flux-2/flex-text-to-image"
 
-    /// Flux 2 - Fast image generation model
-    /// Documentation: https://docs.kie.ai/cn/market/flux-2
-    case flux2 = "flux-2"
-
-    /// Z-Image - Specialized image generation
-    /// Documentation: https://docs.kie.ai/cn/market/z-image
-    case zImage = "z-image"
-
-    // MARK: - Video Generation Models
-
-    /// Kling 2.6 - Advanced video generation (text-to-video)
+    /// Kling 2.6 - Text-to-video generation
     /// Model identifier: "kling-2.6/text-to-video"
-    /// Documentation: https://docs.kie.ai/cn/market/kling
+    /// Documentation: https://docs.kie.ai/market/kling
     case kling26 = "kling-2.6/text-to-video"
 
-    /// Wan 2.6 - High-quality video synthesis
-    /// Documentation: https://docs.kie.ai/cn/market/wan
-    case wan26 = "wan-2.6"
+    // MARK: - Helper Methods
 
-    /// Seedance 1.5 Pro - Professional dance and motion video generation
-    /// Documentation: https://docs.kie.ai/cn/market/seedance
-    case seedance15Pro = "seedance-1.5-pro"
-
-    // MARK: - Audio Generation Models
-
-    /// Placeholder for audio models (add actual model names when available)
-    // Uncomment when audio models are documented:
-    // case audioModel1 = "audio-model-1"
-
-    /// Returns all image generation models.
+    /// Returns all verified image generation models.
     public static var allImageModels: [KieModel] {
-        return [.gptImage15, .seedream45, .flux2, .zImage]
+        return [.gptImage15, .flux2Flex]
     }
 
-    /// Returns all video generation models.
+    /// Returns all verified video generation models.
     public static var allVideoModels: [KieModel] {
-        return [.kling26, .wan26, .seedance15Pro]
-    }
-
-    /// Returns all audio generation models.
-    public static var allAudioModels: [KieModel] {
-        // Add audio models when available
-        return []
+        return [.kling26]
     }
 }
