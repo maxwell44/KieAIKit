@@ -79,10 +79,18 @@ final class TaskPoller {
                 try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
 
             } catch let apiError as APIError {
-                // Re-throw API errors (including timeout)
-                throw apiError
+                // For fatal errors, fail immediately
+                switch apiError {
+                case .notFound, .unauthorized, .badRequest, .timeout:
+                    throw apiError
+                case .requestFailed, .serverError, .rateLimited:
+                    // For these, continue polling
+                    try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                default:
+                    throw apiError
+                }
             } catch {
-                // For other errors, log and continue polling
+                // For decoding and other errors, continue polling
                 try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
             }
         }
