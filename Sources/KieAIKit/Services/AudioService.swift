@@ -38,40 +38,46 @@ public final class AudioService {
         model: KieModel,
         request: AudioGenerationRequest
     ) async throws -> TaskInfo {
-        struct GenerationBody: Codable {
+        struct JobRequestBody: Codable {
             let model: String
-            let prompt: String
-            let duration: Double?
-            let audioType: String?
-            let seed: Int?
-            let parameters: [String: AnyCodable]?
+            let input: AudioInput
 
-            enum CodingKeys: String, CodingKey {
-                case model
-                case prompt
-                case duration
-                case audioType = "audio_type"
-                case seed
-                case parameters
+            struct AudioInput: Codable {
+                let prompt: String
+                let duration: Double?
+                let audioType: String?
+                let seed: Int?
+
+                enum CodingKeys: String, CodingKey {
+                    case prompt
+                    case duration
+                    case audioType = "audio_type"
+                    case seed
+                }
             }
         }
 
-        let body = GenerationBody(
+        let body = JobRequestBody(
             model: model.rawValue,
-            prompt: request.prompt,
-            duration: request.duration,
-            audioType: request.audioType?.rawValue,
-            seed: request.seed,
-            parameters: request.parameters
+            input: JobRequestBody.AudioInput(
+                prompt: request.prompt,
+                duration: request.duration,
+                audioType: request.audioType?.rawValue,
+                seed: request.seed
+            )
         )
 
         let apiRequest = APIRequest(
-            path: "audio/generate",
+            path: "jobs/createTask",
             method: .post,
             body: body
         )
 
-        let taskInfo = try await apiClient.perform(apiRequest, as: TaskInfo.self)
+        // The API returns a wrapped response with task ID
+        let taskResponse = try await apiClient.performAndUnwrap(apiRequest, as: TaskCreationResponse.self)
+
+        // Create a TaskInfo from the task ID
+        let taskInfo = TaskInfo(id: taskResponse.taskId, status: .pending)
 
         // Validate the task info before returning
         try taskInfo.validate()
@@ -93,20 +99,26 @@ public final class AudioService {
         timeout: TimeInterval = 300.0
     ) async throws -> AudioGenerationResult {
         // Poll until complete, result contains the final task status
-        _ = try await poller.poll(
+        let finalTaskInfo = try await poller.poll(
             taskId: task.id,
-            endpoint: "audio/tasks",
+            endpoint: "jobs/getTaskStatus",
             interval: interval,
             timeout: timeout
         )
 
-        // Now fetch the actual result
-        let request = APIRequest<EmptyRequestBody>(
-            path: "audio/results/\(task.id)",
-            method: .get
-        )
+        // Build result from the completed task info
+        guard let resultURL = finalTaskInfo.resultURL else {
+            throw APIError.serverError("Task completed but no result URL provided")
+        }
 
-        return try await apiClient.perform(request, as: AudioGenerationResult.self)
+        return AudioGenerationResult(
+            taskId: finalTaskInfo.id,
+            audioURL: resultURL,
+            model: finalTaskInfo.model ?? "unknown",
+            prompt: "",  // Prompt not returned in task status
+            duration: finalTaskInfo.metadata?["duration"] != nil ? Double(finalTaskInfo.metadata!["duration"]!) : nil,
+            metadata: finalTaskInfo.metadata
+        )
     }
 
     /// Generates audio and waits for completion in one call.

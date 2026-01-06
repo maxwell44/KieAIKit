@@ -52,25 +52,8 @@ final class TaskPoller {
                     method: .get
                 )
 
-                let urlRequest = try request.makeURLRequest(
-                    baseURL: apiClient.configuration.baseURL,
-                    apiKey: apiClient.configuration.apiKey
-                )
-
-                let (data, response) = try await apiClient.session.data(for: urlRequest)
-
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    throw APIError.unknown(URLError(.badServerResponse))
-                }
-
-                guard 200...299 ~= httpResponse.statusCode else {
-                    throw APIError.from(response: httpResponse, data: data)
-                }
-
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-
-                let taskInfo = try decoder.decode(TaskInfo.self, from: data)
+                // Use the new performAndUnwrap method to handle the wrapped response
+                let taskInfo = try await apiClient.performAndUnwrap(request, as: TaskInfo.self)
 
                 // Validate the task info
                 try taskInfo.validate()

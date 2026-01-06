@@ -20,8 +20,7 @@ public struct Configuration {
 
     /// The base URL for the Kie.ai API.
     ///
-    /// Defaults to `https://api.kie.ai/api/v1`. You typically don't need to change this
-    /// unless you're working with a custom API endpoint or testing environment.
+    /// Default: `https://api.kie.ai/api/v1`
     public let baseURL: String
 
     /// Default timeout for network requests in seconds.

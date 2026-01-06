@@ -38,47 +38,52 @@ public final class ImageService {
         model: KieModel,
         request: ImageGenerationRequest
     ) async throws -> TaskInfo {
-        struct GenerationBody: Codable {
+        struct JobRequestBody: Codable {
             let model: String
-            let prompt: String
-            let negativePrompt: String?
-            let count: Int?
-            let width: Int?
-            let height: Int?
-            let seed: Int?
-            let parameters: [String: AnyCodable]?
+            let input: ImageInput
 
-            enum CodingKeys: String, CodingKey {
-                case model
-                case prompt
-                case negativePrompt = "negative_prompt"
-                case count
-                case width
-                case height
-                case seed
-                case parameters
+            struct ImageInput: Codable {
+                let prompt: String
+                let negativePrompt: String?
+                let count: Int?
+                let width: Int?
+                let height: Int?
+                let seed: Int?
+
+                enum CodingKeys: String, CodingKey {
+                    case prompt
+                    case negativePrompt = "negative_prompt"
+                    case count
+                    case width
+                    case height
+                    case seed
+                }
             }
         }
 
-        let body = GenerationBody(
+        let body = JobRequestBody(
             model: model.rawValue,
-            prompt: request.prompt,
-            negativePrompt: request.negativePrompt,
-            count: request.count,
-            width: request.width,
-            height: request.height,
-            seed: request.seed,
-            parameters: request.parameters
+            input: JobRequestBody.ImageInput(
+                prompt: request.prompt,
+                negativePrompt: request.negativePrompt,
+                count: request.count,
+                width: request.width,
+                height: request.height,
+                seed: request.seed
+            )
         )
 
         let apiRequest = APIRequest(
-            path: "images/generate",
+            path: "jobs/createTask",
             method: .post,
             body: body
         )
 
-        // The API returns a task info with the task ID
-        let taskInfo = try await apiClient.perform(apiRequest, as: TaskInfo.self)
+        // The API returns a wrapped response with task ID
+        let taskResponse = try await apiClient.performAndUnwrap(apiRequest, as: TaskCreationResponse.self)
+
+        // Create a TaskInfo from the task ID
+        let taskInfo = TaskInfo(id: taskResponse.taskId, status: .pending)
 
         // Validate the task info before returning
         try taskInfo.validate()
@@ -100,20 +105,28 @@ public final class ImageService {
         timeout: TimeInterval = 300.0
     ) async throws -> ImageGenerationResult {
         // Poll until complete, result contains the final task status
-        _ = try await poller.poll(
+        let finalTaskInfo = try await poller.poll(
             taskId: task.id,
-            endpoint: "images/tasks",
+            endpoint: "jobs/getTaskStatus",
             interval: interval,
             timeout: timeout
         )
 
-        // Now fetch the actual result
-        let request = APIRequest<EmptyRequestBody>(
-            path: "images/results/\(task.id)",
-            method: .get
-        )
+        // Build result from the completed task info
+        guard let resultURL = finalTaskInfo.resultURL else {
+            throw APIError.serverError("Task completed but no result URL provided")
+        }
 
-        return try await apiClient.perform(request, as: ImageGenerationResult.self)
+        return ImageGenerationResult(
+            taskId: finalTaskInfo.id,
+            imageUrls: [resultURL],
+            model: finalTaskInfo.model ?? "unknown",
+            prompt: "",  // Prompt not returned in task status
+            width: nil,
+            height: nil,
+            seed: nil,
+            metadata: finalTaskInfo.metadata
+        )
     }
 
     /// Generates an image and waits for completion in one call.

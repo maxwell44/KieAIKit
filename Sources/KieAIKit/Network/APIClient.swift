@@ -84,4 +84,56 @@ final class APIClient {
             throw APIError.from(response: httpResponse, data: nil)
         }
     }
+
+    /// Performs a request and decodes the response with Kie.ai wrapper.
+    ///
+    /// This method automatically unwraps the Kie.ai API response format:
+    /// ```json
+    /// {
+    ///   "code": 200,
+    ///   "msg": "success",
+    ///   "data": { ... }
+    /// }
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - request: The API request to perform
+    ///   - responseType: The type to decode the data field as
+    /// - Returns: The unwrapped data from the response
+    /// - Throws: An APIError if the request fails or returns an error code
+    func performAndUnwrap<RequestBody: Encodable, Response: Decodable>(
+        _ request: APIRequest<RequestBody>,
+        as responseType: Response.Type
+    ) async throws -> Response {
+        let urlRequest = try request.makeURLRequest(
+            baseURL: configuration.baseURL,
+            apiKey: configuration.apiKey
+        )
+
+        let (data, response) = try await session.data(for: urlRequest)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.unknown(URLError(.badServerResponse))
+        }
+
+        // Check for HTTP-level errors first
+        guard 200...299 ~= httpResponse.statusCode else {
+            throw APIError.from(response: httpResponse, data: data)
+        }
+
+        do {
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+
+            // Decode the wrapped response
+            let wrappedResponse = try decoder.decode(APIResponse<Response>.self, from: data)
+
+            // Validate and unwrap
+            return try wrappedResponse.validateAndGet()
+        } catch let error as APIError {
+            throw error
+        } catch {
+            throw APIError.decodingFailed(error)
+        }
+    }
 }

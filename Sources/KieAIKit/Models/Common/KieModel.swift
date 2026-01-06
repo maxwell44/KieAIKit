@@ -11,6 +11,8 @@ import Foundation
 ///
 /// This enum provides type safety when specifying which model to use for generation.
 /// Do not use arbitrary strings - always use these predefined cases.
+///
+/// Model names follow the Kie.ai naming convention (e.g., "gpt-image-1.5", "kling/v2-1-pro")
 public enum KieModel: String, Codable, Sendable {
 
     // MARK: - Image Generation Models
@@ -29,8 +31,9 @@ public enum KieModel: String, Codable, Sendable {
 
     // MARK: - Video Generation Models
 
-    /// Kling 2.6 - Advanced video generation
-    case kling26 = "kling-2.6"
+    /// Kling V2.1 Pro - Advanced video generation
+    /// Model identifier: "kling/v2-1-pro"
+    case klingV21Pro = "kling/v2-1-pro"
 
     /// Wan 2.6 - High-quality video synthesis
     case wan26 = "wan-2.6"
@@ -51,7 +54,7 @@ public enum KieModel: String, Codable, Sendable {
 
     /// Returns all video generation models.
     public static var allVideoModels: [KieModel] {
-        return [.kling26, .wan26, .seedance15Pro]
+        return [.klingV21Pro, .wan26, .seedance15Pro]
     }
 
     /// Returns all audio generation models.

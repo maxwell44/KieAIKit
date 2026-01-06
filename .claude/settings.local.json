@@ -18,7 +18,11 @@
       "Bash(log show:*)",
       "Bash(cat:*)",
       "Bash(xcrun simctl spawn:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "WebSearch"
     ]
   }
 }

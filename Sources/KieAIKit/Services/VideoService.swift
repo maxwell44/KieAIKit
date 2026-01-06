@@ -38,49 +38,55 @@ public final class VideoService {
         model: KieModel,
         request: VideoGenerationRequest
     ) async throws -> TaskInfo {
-        struct GenerationBody: Codable {
+        struct JobRequestBody: Codable {
             let model: String
-            let prompt: String
-            let negativePrompt: String?
-            let duration: Int?
-            let aspectRatio: String?
-            let fps: Int?
-            let seed: Int?
-            let initImageURL: URL?
-            let parameters: [String: AnyCodable]?
+            let input: VideoInput
 
-            enum CodingKeys: String, CodingKey {
-                case model
-                case prompt
-                case negativePrompt = "negative_prompt"
-                case duration
-                case aspectRatio = "aspect_ratio"
-                case fps
-                case seed
-                case initImageURL = "init_image_url"
-                case parameters
+            struct VideoInput: Codable {
+                let prompt: String
+                let negativePrompt: String?
+                let duration: Int?
+                let aspectRatio: String?
+                let fps: Int?
+                let seed: Int?
+                let initImageURL: URL?
+
+                enum CodingKeys: String, CodingKey {
+                    case prompt
+                    case negativePrompt = "negative_prompt"
+                    case duration
+                    case aspectRatio = "aspect_ratio"
+                    case fps
+                    case seed
+                    case initImageURL = "init_image_url"
+                }
             }
         }
 
-        let body = GenerationBody(
+        let body = JobRequestBody(
             model: model.rawValue,
-            prompt: request.prompt,
-            negativePrompt: request.negativePrompt,
-            duration: request.duration,
-            aspectRatio: request.aspectRatio?.rawValue,
-            fps: request.fps,
-            seed: request.seed,
-            initImageURL: request.initImageURL,
-            parameters: request.parameters
+            input: JobRequestBody.VideoInput(
+                prompt: request.prompt,
+                negativePrompt: request.negativePrompt,
+                duration: request.duration,
+                aspectRatio: request.aspectRatio?.rawValue,
+                fps: request.fps,
+                seed: request.seed,
+                initImageURL: request.initImageURL
+            )
         )
 
         let apiRequest = APIRequest(
-            path: "videos/generate",
+            path: "jobs/createTask",
             method: .post,
             body: body
         )
 
-        let taskInfo = try await apiClient.perform(apiRequest, as: TaskInfo.self)
+        // The API returns a wrapped response with task ID
+        let taskResponse = try await apiClient.performAndUnwrap(apiRequest, as: TaskCreationResponse.self)
+
+        // Create a TaskInfo from the task ID
+        let taskInfo = TaskInfo(id: taskResponse.taskId, status: .pending)
 
         // Validate the task info before returning
         try taskInfo.validate()
@@ -102,20 +108,26 @@ public final class VideoService {
         timeout: TimeInterval = 600.0
     ) async throws -> VideoGenerationResult {
         // Poll until complete, result contains the final task status
-        _ = try await poller.poll(
+        let finalTaskInfo = try await poller.poll(
             taskId: task.id,
-            endpoint: "videos/tasks",
+            endpoint: "jobs/getTaskStatus",
             interval: interval,
             timeout: timeout
         )
 
-        // Now fetch the actual result
-        let request = APIRequest<EmptyRequestBody>(
-            path: "videos/results/\(task.id)",
-            method: .get
-        )
+        // Build result from the completed task info
+        guard let resultURL = finalTaskInfo.resultURL else {
+            throw APIError.serverError("Task completed but no result URL provided")
+        }
 
-        return try await apiClient.perform(request, as: VideoGenerationResult.self)
+        return VideoGenerationResult(
+            taskId: finalTaskInfo.id,
+            videoURL: resultURL,
+            model: finalTaskInfo.model ?? "unknown",
+            prompt: "",  // Prompt not returned in task status
+            duration: finalTaskInfo.metadata?["duration"] != nil ? Double(finalTaskInfo.metadata!["duration"]!) : nil,
+            metadata: finalTaskInfo.metadata
+        )
     }
 
     /// Generates a video and waits for completion in one call.
