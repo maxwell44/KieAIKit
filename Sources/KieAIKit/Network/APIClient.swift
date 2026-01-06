@@ -125,6 +125,14 @@ final class APIClient {
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
 
+            // Debug: Print raw response in DEBUG mode
+            #if DEBUG
+            if let rawString = String(data: data, encoding: .utf8) {
+                print("🧾 KieAIKit Raw Response:")
+                print(rawString)
+            }
+            #endif
+
             // Decode the wrapped response
             let wrappedResponse = try decoder.decode(APIResponse<Response>.self, from: data)
 
