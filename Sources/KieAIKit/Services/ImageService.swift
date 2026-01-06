@@ -112,6 +112,17 @@ public final class ImageService {
             }
             input["quality"] = "medium"  // Default quality
 
+        case .flux2Flex:
+            // Flux-2 requires aspect_ratio (string) and resolution (string)
+            if let width = request.width, let height = request.height {
+                // Convert width/height to aspect_ratio string
+                let gcd = greatestCommonDivisor(width, height)
+                input["aspect_ratio"] = "\(width/gcd):\(height/gcd)"
+            } else {
+                input["aspect_ratio"] = "1:1"  // Default
+            }
+            input["resolution"] = "1K"  // Default resolution
+
         default:
             // For other models, use the traditional width/height/negativePrompt fields
             if let negativePrompt = request.negativePrompt {
