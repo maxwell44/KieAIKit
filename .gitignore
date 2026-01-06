@@ -1,0 +1,23 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+*.swiftpm
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# macOS
+.DS_Store
+
+# Tests
+*.gcno
+*.gcda
+覆盖率报告/
+
+# Temporary files
+*.tmp
+*.log
