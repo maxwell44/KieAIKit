@@ -42,6 +42,15 @@ public final class ImageService {
         // Different models require different input structures
         let inputDict = buildInputForModel(model, request: request)
 
+        // Debug: Print the request body
+        #if DEBUG
+        if let jsonData = try? JSONSerialization.data(withJSONObject: ["model": model.rawValue, "input": inputDict], options: .prettyPrinted),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            print("🔍 KieAIKit Request Body:")
+            print(jsonString)
+        }
+        #endif
+
         // Create request using AnyCodable
         struct DynamicBody: Encodable {
             let model: String
