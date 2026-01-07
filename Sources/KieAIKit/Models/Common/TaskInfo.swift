@@ -44,17 +44,80 @@ public struct TaskInfo: Codable, Sendable {
     public let metadata: [String: String]?
 
     private enum CodingKeys: String, CodingKey {
-        case id = "taskId"  // API uses camelCase "taskId"
-        case status
+        case id = "taskId"     // API uses "taskId"
+        case status = "state"  // API uses "state" not "status"
         case contentType = "content_type"
         case model
-        case createdAt = "created_at"
+        case createdAt  // Will decode "createTime" manually
         case startedAt = "started_at"
-        case completedAt = "completed_at"
-        case errorMessage = "error_message"
+        case completedAt  // Will decode "completeTime" manually
+        case errorMessage  // Will decode "failMsg" manually
+        case failCode
+        case failMsg
+        case resultJson  // API uses "resultJson" for result
         case progress
         case resultURL = "result_url"
         case metadata
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        // Required fields
+        id = try container.decode(String.self, forKey: .id)
+        status = try container.decode(TaskStatus.self, forKey: .status)
+
+        // Optional fields
+        contentType = try container.decodeIfPresent(ContentType.self, forKey: .contentType)
+        model = try container.decodeIfPresent(String.self, forKey: .model)
+
+        // Handle timestamp fields (milliseconds since epoch)
+        if let createTimeTimestamp = try? container.decode(Int64.self, forKey: .createdAt) {
+            createdAt = Date(timeIntervalSince1970: TimeInterval(createTimeTimestamp) / 1000.0)
+        } else {
+            createdAt = nil
+        }
+
+        if let completeTimeTimestamp = try? container.decodeIfPresent(Int64.self, forKey: .completedAt) {
+            completedAt = Date(timeIntervalSince1970: TimeInterval(completeTimeTimestamp) / 1000.0)
+        } else {
+            completedAt = nil
+        }
+
+        startedAt = try container.decodeIfPresent(Date.self, forKey: .startedAt)
+
+        // Error message can be from "failMsg" or "errorMessage"
+        errorMessage = try container.decodeIfPresent(String.self, forKey: .failMsg) ??
+                       try container.decodeIfPresent(String.self, forKey: .errorMessage)
+
+        progress = try container.decodeIfPresent(Int.self, forKey: .progress)
+
+        // Result URL - try to get from "resultJson" field
+        if let resultJson = try? container.decode(String.self, forKey: .resultJson),
+           !resultJson.isEmpty,
+           let data = resultJson.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let urlString = json["url"] as? String,
+           let url = URL(string: urlString) {
+            resultURL = url
+        } else {
+            resultURL = try container.decodeIfPresent(URL.self, forKey: .resultURL)
+        }
+
+        metadata = try container.decodeIfPresent([String: String].self, forKey: .metadata)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encode(id, forKey: .id)
+        try container.encode(status, forKey: .status)
+        try container.encodeIfPresent(contentType, forKey: .contentType)
+        try container.encodeIfPresent(model, forKey: .model)
+        try container.encodeIfPresent(errorMessage, forKey: .errorMessage)
+        try container.encodeIfPresent(progress, forKey: .progress)
+        try container.encodeIfPresent(resultURL, forKey: .resultURL)
+        try container.encodeIfPresent(metadata, forKey: .metadata)
     }
 
     public init(
