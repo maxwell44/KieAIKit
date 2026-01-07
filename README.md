@@ -10,6 +10,8 @@ A type-safe, modern Swift SDK for interacting with the Kie.ai REST API. KieAIKit
 - **Type-Safe Models**: Strongly-typed enums for available AI models - no more stringly-typed model names
 - **Async/Await**: Modern Swift concurrency with async/await throughout
 - **Task Polling**: Built-in polling mechanism for asynchronous generation tasks
+- **Image Editing**: Support for image-to-image editing with Google Nano Banana models
+- **File Upload**: Built-in file upload service for image/video editing workflows
 - **Clean API**: Simple, expressive API that hides the complexity of HTTP and JSON
 - **Debug Support**: Built-in request/response logging in DEBUG mode
 - **No Dependencies**: Built on Foundation only - no third-party networking libraries
@@ -84,6 +86,79 @@ do {
 }
 ```
 
+#### Image Editing
+
+Edit existing images using AI-powered models:
+
+```swift
+do {
+    // Using remote image URL (recommended)
+    let imageURL = URL(string: "https://example.com/image.jpg")!
+
+    let result = try await client.image.editAndWait(
+        model: .googleNanoBananaEdit,
+        request: ImageEditRequest.with(
+            prompt: "Change the background to a sunset beach",
+            imageURL: imageURL,
+            outputFormat: "png",
+            imageSize: "1:1"
+        ),
+        timeout: 300.0
+    )
+
+    print("Edited image URL: \(result.primaryImageURL!)")
+
+} catch {
+    print("Error: \(error)")
+}
+```
+
+**Using Nano Banana Pro (Advanced Editing):**
+
+```swift
+do {
+    let result = try await client.image.nanoBananaProAndWait(
+        request: NanoBananaProRequest.with(
+            prompt: "Comic poster: cool banana hero in shades",
+            imageURL: imageURL,
+            aspectRatio: "16:9",
+            resolution: "2K",
+            outputFormat: "png"
+        ),
+        timeout: 300.0
+    )
+
+    print("Generated image URL: \(result.primaryImageURL!)")
+
+} catch {
+    print("Error: \(error)")
+}
+```
+
+**Uploading Local Images:**
+
+```swift
+do {
+    // Upload local image and use it for editing
+    let imageData = jpegData(compressionQuality: 0.9)
+
+    let result = try await client.editImage(
+        imageData,
+        prompt: "Add a vintage film effect",
+        outputFormat: "png",
+        imageSize: "1:1",
+        timeout: 300.0
+    )
+
+    print("Edited image URL: \(result.primaryImageURL!)")
+
+} catch {
+    print("Error: \(error)")
+}
+```
+
+> **Note**: When uploading local images, ensure the file has a valid image extension (.jpg, .png, etc.) to avoid "file type not supported" errors. Using remote URLs is recommended.
+
 ## Best Practices
 
 ### Separating Task Creation from Waiting
@@ -154,14 +229,35 @@ let client = KieAIClient(configuration: config)
 
 #### Verified Models
 
-```swift
-// Image Models
-KieModel.gptImage15      // "gpt-image/1.5-text-to-image"
-KieModel.flux2Flex       // "flux-2/flex-text-to-image"
+##### Text-to-Image Models
 
-// Video Models
-KieModel.kling26         // "kling-2.6/text-to-video"
+```swift
+KieModel.gptImage15      // "gpt-image/1.5-text-to-image" - Immediate response
+KieModel.flux2Flex       // "flux-2/flex-text-to-image" - Async task
 ```
+
+##### Image-to-Image / Image Editing Models
+
+```swift
+KieModel.googleNanoBananaEdit  // "google/nano-banana-edit" - Basic image editing
+KieModel.nanoBananaPro         // "nano-banana-pro" - Advanced editing with resolution control
+```
+
+##### Text-to-Video Models
+
+```swift
+KieModel.kling26         // "kling-2.6/text-to-video" - Async task
+```
+
+#### Model Comparison
+
+| Model | Type | Features | Execution |
+|-------|------|----------|-----------|
+| GPT Image 1.5 | Text-to-Image | Fast generation | Immediate |
+| Flux-2 Flex | Text-to-Image | High quality | Async |
+| Nano Banana Edit | Image-to-Image | Basic editing | Async |
+| Nano Banana Pro | Image-to-Image | Advanced editing, resolution control | Async |
+| Kling 2.6 | Text-to-Video | Video generation | Async |
 
 ### Detailed Request Configuration
 
@@ -185,6 +281,8 @@ Different models may require different input formats. The SDK handles this autom
 
 - **GPT Image 1.5**: Requires `aspect_ratio` (string) and `quality` (string)
 - **Flux-2**: Requires `aspect_ratio` (string) and `resolution` (string)
+- **Nano Banana Edit**: Requires `image_urls` and optional `output_format`, `image_size`
+- **Nano Banana Pro**: Requires `prompt`, `aspect_ratio`, `resolution`, `output_format`, `image_input`
 
 ```swift
 // GPT Image example
@@ -202,7 +300,36 @@ let result2 = try await client.generateImage(
     width: 1024,
     height: 1024
 )
+
+// Nano Banana Edit example
+let result3 = try await client.image.editAndWait(
+    model: .googleNanoBananaEdit,
+    request: ImageEditRequest.with(
+        prompt: "Make it look like a watercolor painting",
+        imageURL: imageURL
+    )
+)
+
+// Nano Banana Pro example
+let result4 = try await client.image.nanoBananaProAndWait(
+    request: NanoBananaProRequest.with(
+        prompt: "Comic poster style",
+        imageURL: imageURL,
+        aspectRatio: "16:9",
+        resolution: "2K"
+    )
+)
 ```
+
+#### Nano Banana Pro Parameters
+
+Nano Banana Pro supports additional parameters for advanced control:
+
+| Parameter | Values | Description |
+|-----------|--------|-------------|
+| `aspectRatio` | "1:1", "16:9", "9:16", "21:9" | Output aspect ratio |
+| `resolution` | "1K", "2K", "4K" | Output resolution |
+| `outputFormat` | "png", "jpg", "webp" | Output format |
 
 ## Debugging
 
@@ -308,3 +435,28 @@ Please feel free to submit pull requests or open issues.
 
 For issues specific to this SDK, please use the GitHub issue tracker.
 For Kie.ai API issues, contact Kie.ai support directly.
+
+## Changelog
+
+### Latest Updates
+
+#### Version 1.1.0
+- ✨ Added `nano-banana-pro` model support
+  - Advanced image editing with resolution control (1K, 2K, 4K)
+  - Custom aspect ratios (1:1, 16:9, 9:16, 21:9)
+  - Support for multi-image input
+- ✨ Added `google/nano-banana-edit` model support
+  - Basic image-to-image editing
+  - Remote URL support
+- ✨ Added file upload service
+  - Upload from URL, Base64, or raw data
+  - Automatic file handling with 3-day expiration
+- 🐛 Fixed file upload response parsing to match actual API format
+- 📝 Updated documentation with image editing examples
+
+#### Version 1.0.0
+- Initial release
+- Text-to-image generation (GPT Image 1.5, Flux-2)
+- Text-to-video generation (Kling 2.6)
+- Task polling and result retrieval
+- Debug logging support
