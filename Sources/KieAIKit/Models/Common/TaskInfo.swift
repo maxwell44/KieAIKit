@@ -98,7 +98,8 @@ public struct TaskInfo: Codable, Sendable {
            !resultJson.isEmpty,
            let data = resultJson.data(using: .utf8),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let urlString = json["url"] as? String,
+           let resultUrls = json["resultUrls"] as? [String],
+           let urlString = resultUrls.first,
            let url = URL(string: urlString) {
             resultURL = url
         } else {
