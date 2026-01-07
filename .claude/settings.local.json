@@ -25,7 +25,8 @@
       "WebSearch",
       "Bash(git ls-remote:*)",
       "Bash(curl:*)",
-      "Bash(git revert:*)"
+      "Bash(git revert:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }
