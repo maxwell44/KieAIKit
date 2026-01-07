@@ -78,6 +78,8 @@ public final class FileUploadService {
         uploadPath: String? = nil,
         fileName: String? = nil
     ) async throws -> UploadedFile {
+        print("📤 uploadBase64 called, data length: \(base64Data.count), uploadPath: \(uploadPath ?? "nil")")
+
         struct Base64UploadBody: Encodable {
             let base64Data: String
             let uploadPath: String?
@@ -89,6 +91,8 @@ public final class FileUploadService {
             uploadPath: uploadPath,
             fileName: fileName
         )
+
+        print("📤 Calling performUpload with endpoint: file-base64-upload")
 
         return try await performUpload(
             endpoint: "file-base64-upload",
@@ -200,7 +204,10 @@ public final class FileUploadService {
         body: Body,
         useJson: Bool
     ) async throws -> UploadedFile {
-        guard let url = URL(string: "\(fileUploadBaseURL)/api/\(endpoint)") else {
+        let fullURL = "\(fileUploadBaseURL)/api/\(endpoint)"
+        print("📡 performUpload: \(fullURL)")
+
+        guard let url = URL(string: fullURL) else {
             throw APIError.invalidURL(endpoint)
         }
 
@@ -212,18 +219,40 @@ public final class FileUploadService {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             let encoder = JSONEncoder()
             encoder.outputFormatting = .withoutEscapingSlashes
-            request.httpBody = try encoder.encode(body)
+            let requestBody = try encoder.encode(body)
+            request.httpBody = requestBody
+
+            // Debug: print request body (truncated if too long)
+            if let bodyString = String(data: requestBody, encoding: .utf8) {
+                let preview = bodyString.count > 500 ? String(bodyString.prefix(500)) + "..." : bodyString
+                print("📤 Request body: \(preview)")
+            }
         }
+
+        print("⏳ Sending request...")
 
         // Perform request
         let (data, response) = try await URLSession.shared.data(for: request)
+
+        print("📥 Response received, \(data.count) bytes")
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.unknown(NSError(domain: "KieAIKit", code: -1))
         }
 
+        print("📊 Status code: \(httpResponse.statusCode)")
+
         guard (200...299).contains(httpResponse.statusCode) else {
+            print("❌ HTTP error: \(httpResponse.statusCode)")
+            if let errorString = String(data: data, encoding: .utf8) {
+                print("❌ Error response: \(errorString)")
+            }
             throw APIError.requestFailed(httpResponse.statusCode, data)
+        }
+
+        // DEBUG: Print response for debugging
+        if let jsonString = String(data: data, encoding: .utf8) {
+            print("📦 File upload API response: \(jsonString)")
         }
 
         // Decode response

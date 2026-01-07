@@ -205,8 +205,12 @@ public final class KieAIClient {
         imageSize: String = "1:1",
         timeout: TimeInterval = 300.0
     ) async throws -> ImageGenerationResult {
+        print("🔄 Step 1: Uploading image (\(imageData.count) bytes)...")
+
         // Step 1: Upload the image
         let imageURL = try await uploadImage(imageData)
+
+        print("✅ Upload complete! Image URL: \(imageURL)")
 
         // Step 2: Create edit request
         let request = ImageEditRequest.with(
@@ -215,6 +219,8 @@ public final class KieAIClient {
             outputFormat: outputFormat,
             imageSize: imageSize
         )
+
+        print("🔄 Step 2: Submitting edit task...")
 
         // Step 3: Submit edit task
         return try await image.editAndWait(
