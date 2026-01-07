@@ -87,8 +87,9 @@ public struct TaskInfo: Codable, Sendable {
         startedAt = try container.decodeIfPresent(Date.self, forKey: .startedAt)
 
         // Error message can be from "failMsg" or "errorMessage"
-        errorMessage = try container.decodeIfPresent(String.self, forKey: .failMsg) ??
-                       try container.decodeIfPresent(String.self, forKey: .errorMessage)
+        let failMsg = try container.decodeIfPresent(String.self, forKey: .failMsg)
+        let errorMsg = try container.decodeIfPresent(String.self, forKey: .errorMessage)
+        errorMessage = failMsg ?? errorMsg
 
         progress = try container.decodeIfPresent(Int.self, forKey: .progress)
 
