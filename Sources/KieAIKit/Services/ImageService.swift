@@ -313,4 +313,97 @@ public final class ImageService {
         let task = try await edit(model: model, request: request)
         return try await waitForResult(task: task, timeout: timeout)
     }
+
+    // MARK: - Nano Banana Pro
+
+    /// Generates an image using Nano Banana Pro model.
+    ///
+    /// This method initiates an asynchronous image generation task and returns
+    /// immediately with a task ID. Use the returned task info with `waitForResult`
+    /// to poll for completion.
+    ///
+    /// - Parameters:
+    ///   - request: The Nano Banana Pro request parameters
+    /// - Returns: A TaskInfo containing the task ID
+    /// - Throws: An APIError if the request fails
+    public func nanoBananaPro(request: NanoBananaProRequest) async throws -> TaskInfo {
+        // Build the request body for Nano Banana Pro
+        let input: [String: Any] = [
+            "prompt": request.prompt,
+            "aspect_ratio": request.aspectRatio,
+            "resolution": request.resolution,
+            "output_format": request.outputFormat,
+            "image_input": request.imageInput.map { $0.absoluteString }
+        ]
+
+        // Debug: Print the request body
+        #if DEBUG
+        struct DebugBody: Encodable {
+            let model: String
+            let input: [String: AnyCodable]
+            init(model: String, input: [String: Any]) {
+                self.model = model
+                self.input = input.mapValues { AnyCodable($0) }
+            }
+        }
+        let debugBody = DebugBody(model: KieModel.nanoBananaPro.rawValue, input: input)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .withoutEscapingSlashes
+        if let jsonData = try? encoder.encode(debugBody),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            print("🔍 KieAIKit Request Body:")
+            print(jsonString)
+        }
+        #endif
+
+        // Create request using AnyCodable
+        struct DynamicBody: Encodable {
+            let model: String
+            let input: [String: AnyCodable]
+
+            init(model: String, input: [String: Any]) {
+                self.model = model
+                self.input = input.mapValues { AnyCodable($0) }
+            }
+        }
+
+        let body = DynamicBody(
+            model: KieModel.nanoBananaPro.rawValue,
+            input: input
+        )
+
+        let apiRequest = APIRequest(
+            path: "jobs/createTask",
+            method: .post,
+            body: body
+        )
+
+        // The API returns a wrapped response with task ID
+        let taskResponse = try await apiClient.performAndUnwrap(apiRequest, as: TaskCreationResponse.self)
+
+        // Create a TaskInfo from the task ID
+        let taskInfo = TaskInfo(id: taskResponse.taskId, status: .pending)
+
+        // Validate the task info before returning
+        try taskInfo.validate()
+
+        return taskInfo
+    }
+
+    /// Generates an image using Nano Banana Pro and waits for completion.
+    ///
+    /// This is a convenience method that combines `nanoBananaPro` and `waitForResult`.
+    ///
+    /// - Parameters:
+    ///   - request: The Nano Banana Pro request parameters
+    ///   - timeout: Maximum time to wait before timing out (default: 300 seconds)
+    /// - Returns: The image generation result
+    /// - Throws: An APIError if generation or polling fails
+    public func nanoBananaProAndWait(
+        request: NanoBananaProRequest,
+        timeout: TimeInterval = 300.0
+    ) async throws -> ImageGenerationResult {
+        let task = try await nanoBananaPro(request: request)
+        return try await waitForResult(task: task, timeout: timeout)
+    }
 }

@@ -26,7 +26,13 @@
       "Bash(git ls-remote:*)",
       "Bash(curl:*)",
       "Bash(git revert:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(git -C /Users/maxwellyu/CC/KieAIKit rev-parse HEAD)",
+      "Bash(git -C /Users/maxwellyu/CC/KieAIKit log --oneline -10)",
+      "Bash(git -C /Users/maxwellyu/CC/KieAIKit status:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git -C /Users/maxwellyu/CC/KieAIKit log --oneline -5)",
+      "Bash(git restore:*)"
     ]
   }
 }
