@@ -33,14 +33,14 @@ public struct FileUploadResponse: Codable, Sendable {
 /// Information about an uploaded file.
 public struct UploadedFile: Codable, Sendable {
 
-    /// Unique file identifier.
-    public let fileId: String
-
     /// The file name as stored on the server.
     public let fileName: String
 
-    /// The original file name before upload.
-    public let originalName: String
+    /// The file path on the server.
+    public let filePath: String
+
+    /// The URL to download the file directly.
+    public let downloadUrl: URL
 
     /// File size in bytes.
     public let fileSize: Int
@@ -48,49 +48,54 @@ public struct UploadedFile: Codable, Sendable {
     /// MIME type of the file.
     public let mimeType: String
 
-    /// The upload path/directory.
-    public let uploadPath: String
-
-    /// The URL to access the uploaded file.
-    public let fileURL: URL
-
-    /// The URL to download the file directly.
-    public let downloadURL: URL
-
     /// When the file was uploaded.
-    public let uploadTime: Date?
+    public let uploadedAt: Date?
 
-    /// When the file will expire (typically 3 days after upload).
-    public let expiresAt: Date?
+    /// Convenience property to get download URL.
+    public var fileURL: URL {
+        return downloadUrl
+    }
 
     private enum CodingKeys: String, CodingKey {
-        case fileId
         case fileName
-        case originalName = "originalName"
+        case filePath
+        case downloadUrl
         case fileSize
         case mimeType
-        case uploadPath
-        case fileURL = "fileUrl"
-        case downloadURL = "downloadUrl"
-        case uploadTime
-        case expiresAt
+        case uploadedAt
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
-        fileId = try container.decode(String.self, forKey: .fileId)
         fileName = try container.decode(String.self, forKey: .fileName)
-        originalName = try container.decode(String.self, forKey: .originalName)
+        filePath = try container.decode(String.self, forKey: .filePath)
+        downloadUrl = try container.decode(URL.self, forKey: .downloadUrl)
         fileSize = try container.decode(Int.self, forKey: .fileSize)
         mimeType = try container.decode(String.self, forKey: .mimeType)
-        uploadPath = try container.decode(String.self, forKey: .uploadPath)
-        fileURL = try container.decode(URL.self, forKey: .fileURL)
-        downloadURL = try container.decode(URL.self, forKey: .downloadURL)
 
-        // Handle optional date fields
-        let dateFormatter = ISO8601DateFormatter()
-        uploadTime = try? container.decodeIfPresent(Date.self, forKey: .uploadTime)
-        expiresAt = try? container.decodeIfPresent(Date.self, forKey: .expiresAt)
+        // Handle date field
+        if let dateString = try? container.decode(String.self, forKey: .uploadedAt) {
+            let dateFormatter = ISO8601DateFormatter()
+            uploadedAt = dateFormatter.date(from: dateString)
+        } else {
+            uploadedAt = nil
+        }
+    }
+
+    public init(
+        fileName: String,
+        filePath: String,
+        downloadUrl: URL,
+        fileSize: Int,
+        mimeType: String,
+        uploadedAt: Date? = nil
+    ) {
+        self.fileName = fileName
+        self.filePath = filePath
+        self.downloadUrl = downloadUrl
+        self.fileSize = fileSize
+        self.mimeType = mimeType
+        self.uploadedAt = uploadedAt
     }
 }
