@@ -48,6 +48,11 @@ public final class KieAIClient {
         return AudioService(apiClient: apiClient)
     }
 
+    /// Service for file upload.
+    public var upload: FileUploadService {
+        return FileUploadService(apiClient: apiClient)
+    }
+
     /// Creates a new Kie.ai client with the specified API key.
     ///
     /// - Parameter apiKey: Your Kie.ai API key
@@ -145,6 +150,78 @@ public final class KieAIClient {
             duration: duration
         )
         return try await audio.generateAndWait(model: model, request: request, timeout: timeout)
+    }
+
+    // MARK: - File Upload Convenience
+
+    /// Uploads image data and returns the URL.
+    ///
+    /// Convenience method for uploading images for use with image editing models.
+    ///
+    /// - Parameters:
+    ///   - data: Image data
+    ///   - fileName: Optional filename
+    /// - Returns: URL of the uploaded image
+    /// - Throws: An APIError if upload fails
+    public func uploadImage(
+        _ data: Data,
+        fileName: String? = nil
+    ) async throws -> URL {
+        let uploadedFile = try await upload.uploadData(data, uploadPath: "images", fileName: fileName)
+        return uploadedFile.fileURL
+    }
+
+    /// Uploads an image from a URL.
+    ///
+    /// - Parameters:
+    ///   - url: Remote image URL
+    ///   - fileName: Optional filename
+    /// - Returns: URL of the uploaded image
+    /// - Throws: An APIError if upload fails
+    public func uploadImageFromURL(
+        _ url: URL,
+        fileName: String? = nil
+    ) async throws -> URL {
+        let uploadedFile = try await upload.uploadFromURL(url, uploadPath: "images", fileName: fileName)
+        return uploadedFile.fileURL
+    }
+
+    /// Edits an image with local data - upload + edit in one call.
+    ///
+    /// This convenience method uploads the image data and then submits the edit request.
+    ///
+    /// - Parameters:
+    ///   - imageData: Local image data to upload and edit
+    ///   - prompt: Edit prompt
+    ///   - outputFormat: Output format (png, jpg, webp)
+    ///   - imageSize: Image size (1:1, 16:9, etc.)
+    ///   - timeout: Maximum wait time
+    /// - Returns: Edited image result
+    /// - Throws: An APIError if upload or edit fails
+    public func editImage(
+        _ imageData: Data,
+        prompt: String,
+        outputFormat: String = "png",
+        imageSize: String = "1:1",
+        timeout: TimeInterval = 300.0
+    ) async throws -> ImageGenerationResult {
+        // Step 1: Upload the image
+        let imageURL = try await uploadImage(imageData)
+
+        // Step 2: Create edit request
+        let request = ImageEditRequest.with(
+            prompt: prompt,
+            imageURL: imageURL,
+            outputFormat: outputFormat,
+            imageSize: imageSize
+        )
+
+        // Step 3: Submit edit task
+        return try await image.editAndWait(
+            model: .googleNanoBananaEdit,
+            request: request,
+            timeout: timeout
+        )
     }
 }
 
