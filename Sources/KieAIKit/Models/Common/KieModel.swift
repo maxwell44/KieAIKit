@@ -58,6 +58,14 @@ public enum KieModel: String, Codable, Sendable {
     /// This model creates an async task. Use `waitForResult()` to poll for completion.
     case kling26 = "kling-2.6/text-to-video"
 
+    /// Google Nano Banana Edit - Image-to-image editing (ASYNC TASK)
+    /// Model identifier: "google/nano-banana-edit"
+    /// Documentation: https://docs.kie.ai/market/google/nano-banana-edit
+    ///
+    /// This model creates an async task for image editing. Requires source image URLs.
+    /// Use `edit()` method with `ImageEditRequest` and `waitForResult()` to poll for completion.
+    case googleNanoBananaEdit = "google/nano-banana-edit"
+
     // MARK: - Execution Type
 
     /// The execution type for this model (immediate vs async task)
@@ -65,7 +73,7 @@ public enum KieModel: String, Codable, Sendable {
         switch self {
         case .gptImage15:
             return .immediate
-        case .flux2Flex, .kling26:
+        case .flux2Flex, .kling26, .googleNanoBananaEdit:
             return .asyncTask
         }
     }
@@ -74,7 +82,7 @@ public enum KieModel: String, Codable, Sendable {
 
     /// Returns all verified image generation models.
     public static var allImageModels: [KieModel] {
-        return [.gptImage15, .flux2Flex]
+        return [.gptImage15, .flux2Flex, .googleNanoBananaEdit]
     }
 
     /// Returns all verified video generation models.

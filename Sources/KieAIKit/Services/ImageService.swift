@@ -209,4 +209,108 @@ public final class ImageService {
         let task = try await generate(model: model, request: request)
         return try await waitForResult(task: task, timeout: timeout)
     }
+
+    // MARK: - Image Editing (Image-to-Image)
+
+    /// Edits an image using the specified model and edit request.
+    ///
+    /// This method initiates an asynchronous image editing task and returns
+    /// immediately with a task ID. Use the returned task info with `waitForResult`
+    /// to poll for completion.
+    ///
+    /// - Parameters:
+    ///   - model: The AI model to use for editing (e.g., .googleNanoBananaEdit)
+    ///   - request: The edit request parameters
+    /// - Returns: A TaskInfo containing the task ID
+    /// - Throws: An APIError if the request fails
+    public func edit(
+        model: KieModel,
+        request: ImageEditRequest
+    ) async throws -> TaskInfo {
+        // Build the request body for image editing
+        var input: [String: Any] = [
+            "prompt": request.prompt,
+            "image_urls": request.imageURLs.map { $0.absoluteString }
+        ]
+
+        // Add optional parameters
+        if let outputFormat = request.outputFormat {
+            input["output_format"] = outputFormat
+        }
+        if let imageSize = request.imageSize {
+            input["image_size"] = imageSize
+        }
+
+        // Debug: Print the request body
+        #if DEBUG
+        struct DebugBody: Encodable {
+            let model: String
+            let input: [String: AnyCodable]
+            init(model: String, input: [String: Any]) {
+                self.model = model
+                self.input = input.mapValues { AnyCodable($0) }
+            }
+        }
+        let debugBody = DebugBody(model: model.rawValue, input: input)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .withoutEscapingSlashes
+        if let jsonData = try? encoder.encode(debugBody),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            print("🔍 KieAIKit Request Body:")
+            print(jsonString)
+        }
+        #endif
+
+        // Create request using AnyCodable
+        struct DynamicBody: Encodable {
+            let model: String
+            let input: [String: AnyCodable]
+
+            init(model: String, input: [String: Any]) {
+                self.model = model
+                self.input = input.mapValues { AnyCodable($0) }
+            }
+        }
+
+        let body = DynamicBody(
+            model: model.rawValue,
+            input: input
+        )
+
+        let apiRequest = APIRequest(
+            path: "jobs/createTask",
+            method: .post,
+            body: body
+        )
+
+        // The API returns a wrapped response with task ID
+        let taskResponse = try await apiClient.performAndUnwrap(apiRequest, as: TaskCreationResponse.self)
+
+        // Create a TaskInfo from the task ID
+        let taskInfo = TaskInfo(id: taskResponse.taskId, status: .pending)
+
+        // Validate the task info before returning
+        try taskInfo.validate()
+
+        return taskInfo
+    }
+
+    /// Edits an image and waits for completion in one call.
+    ///
+    /// This is a convenience method that combines `edit` and `waitForResult`.
+    ///
+    /// - Parameters:
+    ///   - model: The AI model to use for editing
+    ///   - request: The edit request parameters
+    ///   - timeout: Maximum time to wait before timing out (default: 300 seconds)
+    /// - Returns: The image generation result
+    /// - Throws: An APIError if editing or polling fails
+    public func editAndWait(
+        model: KieModel,
+        request: ImageEditRequest,
+        timeout: TimeInterval = 300.0
+    ) async throws -> ImageGenerationResult {
+        let task = try await edit(model: model, request: request)
+        return try await waitForResult(task: task, timeout: timeout)
+    }
 }
