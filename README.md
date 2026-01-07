@@ -84,6 +84,56 @@ do {
 }
 ```
 
+## Best Practices
+
+### Separating Task Creation from Waiting
+
+For production apps, it's recommended to create the task and wait for results separately:
+
+```swift
+do {
+    // Step 1: Create the task (returns immediately)
+    let task = try await client.image.generate(
+        model: .flux2Flex,
+        request: ImageGenerationRequest(
+            prompt: "一只在雪地里奔跑的猫，电影级画质"
+        )
+    )
+
+    print("✅ 任务已创建，ID: \(task.id)")
+    print("💡 可以保存任务ID，稍后查询结果")
+
+    // Step 2: Wait for completion (optional - can be done later)
+    let result = try await client.image.waitForResult(
+        task: task,
+        timeout: 120  // 120秒超时
+    )
+
+    print("✅ 图片生成成功!")
+    print("   图片URL: \(result.primaryImageURL!)")
+
+} catch let error as APIError {
+    print("❌ API 错误: \(error)")
+}
+```
+
+This approach allows you to:
+- Save the task ID for later polling
+- Handle long-running tasks without blocking
+- Implement background task processing
+- Show progress to users
+
+### Handling Different Task States
+
+The SDK properly handles all task states returned by the API:
+
+- `waiting` - Task is queued and waiting to be processed
+- `pending` - Task is pending (queued)
+- `processing` - Task is currently being processed
+- `success` - Task completed successfully
+- `failed` - Task failed with an error
+- `cancelled` - Task was cancelled
+
 ## Advanced Usage
 
 ### Custom Configuration
