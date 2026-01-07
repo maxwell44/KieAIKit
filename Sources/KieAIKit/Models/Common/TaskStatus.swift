@@ -11,9 +11,6 @@ import Foundation
 public enum TaskStatus: String, Codable, Sendable {
 
     /// The task is waiting to be processed.
-    case waiting = "waiting"
-
-    /// The task is pending (queued).
     case pending = "pending"
 
     /// The task is currently being processed.
@@ -33,7 +30,7 @@ public enum TaskStatus: String, Codable, Sendable {
         switch self {
         case .success, .failed, .cancelled:
             return true
-        case .waiting, .pending, .processing:
+        case .pending, .processing:
             return false
         }
     }

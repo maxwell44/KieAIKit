@@ -44,22 +44,20 @@ public struct TaskInfo: Codable, Sendable {
     public let metadata: [String: String]?
 
     private enum CodingKeys: String, CodingKey {
-        case id = "taskId"     // API uses "taskId"
-        case status = "state"  // API uses "state" not "status"
+        case id = "taskId"  // API uses camelCase "taskId"
+        case status
         case contentType = "content_type"
         case model
-        case createdAt  // Will decode "createTime" manually
+        case createdAt = "created_at"
         case startedAt = "started_at"
-        case completedAt  // Will decode "completeTime" manually
-        case errorMessage  // Will decode "failMsg" manually
-        case failCode
-        case failMsg
-        case resultJson  // API uses "resultJson" for result
+        case completedAt = "completed_at"
+        case errorMessage = "error_message"
         case progress
         case resultURL = "result_url"
         case metadata
     }
 
+<<<<<<< HEAD
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
@@ -121,6 +119,8 @@ public struct TaskInfo: Codable, Sendable {
         try container.encodeIfPresent(metadata, forKey: .metadata)
     }
 
+=======
+>>>>>>> parent of b1b715f (Fix TaskInfo and TaskStatus to match actual KIE API response)
     public init(
         id: String,
         status: TaskStatus,
