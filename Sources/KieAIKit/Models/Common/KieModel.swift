@@ -75,6 +75,35 @@ public enum KieModel: String, Codable, Sendable {
     /// Use `nanoBananaPro()` method with `NanoBananaProRequest` and `waitForResult()` to poll for completion.
     case nanoBananaPro = "nano-banana-pro"
 
+    /// Nano Banana Pro Text-to-Image - Text-to-image generation (ASYNC TASK)
+    /// Model identifier: "nano-banana-pro/text-to-image"
+    /// Documentation: https://kie.ai/nano-banana?model=nano-banana-pro
+    ///
+    /// This model creates an async task for text-to-image generation with advanced parameters.
+    /// Supports resolution control and aspect ratio customization.
+    /// Use `nanoBananaProTextToImage()` method with `NanoBananaProTextToImageRequest` and `waitForResult()` to poll for completion.
+    case nanoBananaProTextToImage = "nano-banana-pro/text-to-image"
+
+    /// Veo 3.1 Text-to-Video - Text-to-video generation (ASYNC TASK)
+    /// Model identifier: "veo-3.1/text-to-video"
+    /// Documentation: https://kie.ai/veo-3-1
+    ///
+    /// This model creates an async task for text-to-video generation with Google's latest Veo 3.1.
+    /// Supports native audio, multi-image reference, start & end frame control, and extended scenes.
+    /// Available in Fast and Quality variants.
+    /// Use `veo31TextToVideo()` method with `Veo31TextToVideoRequest` and `waitForResult()` to poll for completion.
+    case veo31TextToVideo = "veo-3.1/text-to-video"
+
+    /// Veo 3.1 Image-to-Video - Image-to-video generation (ASYNC TASK)
+    /// Model identifier: "veo-3.1/image-to-video"
+    /// Documentation: https://kie.ai/veo-3-1
+    ///
+    /// This model creates an async task for image-to-video generation with Google's latest Veo 3.1.
+    /// Supports native audio, multi-image reference, start & end frame control, and extended scenes.
+    /// Available in Fast and Quality variants.
+    /// Use `veo31ImageToVideo()` method with `Veo31ImageToVideoRequest` and `waitForResult()` to poll for completion.
+    case veo31ImageToVideo = "veo-3.1/image-to-video"
+
     // MARK: - Execution Type
 
     /// The execution type for this model (immediate vs async task)
@@ -82,7 +111,7 @@ public enum KieModel: String, Codable, Sendable {
         switch self {
         case .gptImage15:
             return .immediate
-        case .flux2Flex, .kling26, .googleNanoBananaEdit, .nanoBananaPro:
+        case .flux2Flex, .kling26, .googleNanoBananaEdit, .nanoBananaPro, .nanoBananaProTextToImage, .veo31TextToVideo, .veo31ImageToVideo:
             return .asyncTask
         }
     }
@@ -91,11 +120,11 @@ public enum KieModel: String, Codable, Sendable {
 
     /// Returns all verified image generation models.
     public static var allImageModels: [KieModel] {
-        return [.gptImage15, .flux2Flex, .googleNanoBananaEdit, .nanoBananaPro]
+        return [.gptImage15, .flux2Flex, .googleNanoBananaEdit, .nanoBananaPro, .nanoBananaProTextToImage]
     }
 
     /// Returns all verified video generation models.
     public static var allVideoModels: [KieModel] {
-        return [.kling26]
+        return [.kling26, .veo31TextToVideo, .veo31ImageToVideo]
     }
 }

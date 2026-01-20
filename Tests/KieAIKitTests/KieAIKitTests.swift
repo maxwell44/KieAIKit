@@ -34,29 +34,54 @@ final class KieAIKitTests: XCTestCase {
     // MARK: - KieModel Tests
 
     func testKieModelRawValues() {
-        XCTAssertEqual(KieModel.gptImage15.rawValue, "gpt-image-1.5")
-        XCTAssertEqual(KieModel.seedream45.rawValue, "seedream-4.5")
-        XCTAssertEqual(KieModel.flux2.rawValue, "flux-2")
-        XCTAssertEqual(KieModel.kling26.rawValue, "kling-2.6")
-        XCTAssertEqual(KieModel.wan26.rawValue, "wan-2.6")
+        XCTAssertEqual(KieModel.gptImage15.rawValue, "gpt-image/1.5-text-to-image")
+        XCTAssertEqual(KieModel.flux2Flex.rawValue, "flux-2/flex-text-to-image")
+        XCTAssertEqual(KieModel.kling26.rawValue, "kling-2.6/text-to-video")
+        XCTAssertEqual(KieModel.nanoBananaPro.rawValue, "nano-banana-pro")
+        XCTAssertEqual(KieModel.nanoBananaProTextToImage.rawValue, "nano-banana-pro/text-to-image")
+        XCTAssertEqual(KieModel.veo31TextToVideo.rawValue, "veo-3.1/text-to-video")
+        XCTAssertEqual(KieModel.veo31ImageToVideo.rawValue, "veo-3.1/image-to-video")
     }
 
     func testKieModelCategories() {
+        // Image models
         XCTAssertTrue(KieModel.allImageModels.contains(.gptImage15))
+        XCTAssertTrue(KieModel.allImageModels.contains(.flux2Flex))
+        XCTAssertTrue(KieModel.allImageModels.contains(.nanoBananaPro))
+        XCTAssertTrue(KieModel.allImageModels.contains(.nanoBananaProTextToImage))
+
+        // Video models
         XCTAssertTrue(KieModel.allVideoModels.contains(.kling26))
+        XCTAssertTrue(KieModel.allVideoModels.contains(.veo31TextToVideo))
+        XCTAssertTrue(KieModel.allVideoModels.contains(.veo31ImageToVideo))
+    }
+
+    func testKieModelExecutionTypes() {
+        // Immediate models
+        XCTAssertEqual(KieModel.gptImage15.executionType, .immediate)
+
+        // Async task models
+        XCTAssertEqual(KieModel.flux2Flex.executionType, .asyncTask)
+        XCTAssertEqual(KieModel.kling26.executionType, .asyncTask)
+        XCTAssertEqual(KieModel.nanoBananaPro.executionType, .asyncTask)
+        XCTAssertEqual(KieModel.nanoBananaProTextToImage.executionType, .asyncTask)
+        XCTAssertEqual(KieModel.veo31TextToVideo.executionType, .asyncTask)
+        XCTAssertEqual(KieModel.veo31ImageToVideo.executionType, .asyncTask)
     }
 
     func testKieModelCodable() {
-        let model = KieModel.flux2
+        let models: [KieModel] = [.veo31TextToVideo, .veo31ImageToVideo, .nanoBananaProTextToImage]
         let encoder = JSONEncoder()
         let decoder = JSONDecoder()
 
-        do {
-            let data = try encoder.encode(model)
-            let decoded = try decoder.decode(KieModel.self, from: data)
-            XCTAssertEqual(decoded, .flux2)
-        } catch {
-            XCTFail("Failed to encode/decode KieModel: \(error)")
+        for model in models {
+            do {
+                let data = try encoder.encode(model)
+                let decoded = try decoder.decode(KieModel.self, from: data)
+                XCTAssertEqual(decoded, model, "Failed to encode/decode \(model)")
+            } catch {
+                XCTFail("Failed to encode/decode \(model): \(error)")
+            }
         }
     }
 
