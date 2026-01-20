@@ -149,3 +149,94 @@ public final class VideoService {
         return try await waitForResult(task: task, timeout: timeout)
     }
 }
+
+// MARK: - Extensions for Custom Model Support
+
+extension VideoService {
+
+    /// Generates a video using a custom model identifier string.
+    ///
+    /// Use this for models that are not yet in the KieModel enum.
+    ///
+    /// - Parameters:
+    ///   - modelString: The model identifier (e.g., "veo-3.1/text-to-video")
+    ///   - request: The generation request parameters
+    ///   - timeout: Maximum time to wait before timing out (default: 600 seconds)
+    /// - Returns: The video generation result
+    /// - Throws: An APIError if generation or polling fails
+    public func generateAndWait(
+        modelString: String,
+        request: VideoGenerationRequest,
+        timeout: TimeInterval = 600.0
+    ) async throws -> VideoGenerationResult {
+        struct JobRequestBody: Codable {
+            let model: String
+            let input: VideoInput
+
+            struct VideoInput: Codable {
+                let prompt: String
+                let negativePrompt: String?
+                let duration: Int?
+                let aspectRatio: String?
+                let fps: Int?
+                let seed: Int?
+                let initImageURL: URL?
+
+                enum CodingKeys: String, CodingKey {
+                    case prompt
+                    case negativePrompt = "negative_prompt"
+                    case duration
+                    case aspectRatio = "aspect_ratio"
+                    case fps
+                    case seed
+                    case initImageURL = "init_image_url"
+                }
+            }
+        }
+
+        let body = JobRequestBody(
+            model: modelString,
+            input: JobRequestBody.VideoInput(
+                prompt: request.prompt,
+                negativePrompt: request.negativePrompt,
+                duration: request.duration,
+                aspectRatio: request.aspectRatio?.rawValue,
+                fps: request.fps,
+                seed: request.seed,
+                initImageURL: request.initImageURL
+            )
+        )
+
+        let apiRequest = APIRequest(
+            path: "jobs/createTask",
+            method: .post,
+            body: body
+        )
+
+        // Create task
+        let taskResponse = try await apiClient.performAndUnwrap(apiRequest, as: TaskCreationResponse.self)
+        let taskInfo = TaskInfo(id: taskResponse.taskId, status: .pending)
+        try taskInfo.validate()
+
+        // Wait for result
+        let finalTaskInfo = try await poller.poll(
+            taskId: taskInfo.id,
+            endpoint: "jobs/recordInfo?taskId",
+            interval: 2.0,
+            timeout: timeout
+        )
+
+        guard let resultURL = finalTaskInfo.resultURL else {
+            throw APIError.serverError("Task completed but no result URL provided")
+        }
+
+        return VideoGenerationResult(
+            taskId: finalTaskInfo.id,
+            videoURL: resultURL,
+            model: finalTaskInfo.model ?? modelString,
+            prompt: "",
+            duration: finalTaskInfo.metadata?["duration"] != nil ? Double(finalTaskInfo.metadata!["duration"]!) : nil,
+            metadata: finalTaskInfo.metadata
+        )
+    }
+}
