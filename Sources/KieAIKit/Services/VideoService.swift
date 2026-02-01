@@ -223,7 +223,20 @@ extension VideoService {
             body: jobBody
         )
 
+        // Debug: Print raw response
         let response = try await apiClient.perform(apiRequest, as: Veo31Response.self)
+
+        // Print raw response for debugging
+        print("🧾 [VideoService] Veo 3.1 Response:")
+        print("   Code: \(response.code)")
+        print("   Message: \(response.message)")
+        if let data = response.data {
+            print("   Task ID: \(data.taskId)")
+            print("   Status: \(data.status ?? "nil")")
+            print("   Video URL: \(data.videoUrl?.absoluteString ?? "nil")")
+        } else {
+            print("   Data: nil")
+        }
 
         // Check for immediate success or task creation
         guard response.isSuccess else {
