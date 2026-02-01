@@ -170,12 +170,57 @@ extension VideoService {
         request: Veo31Request,
         timeout: TimeInterval = 600.0
     ) async throws -> VideoGenerationResult {
-        // Call Veo 3.1 endpoint
-        // Note: path is relative to baseURL which already includes "/api/v1"
+        // Call Veo 3.1 using the standard jobs/createTask endpoint
+        // Transform Veo31Request to the job format
+        struct JobRequestBody: Codable {
+            let model: String
+            let input: Veo31Input
+
+            struct Veo31Input: Codable {
+                let prompt: String
+                let imageUrls: [URL]?
+                let model: Veo31Request.VeoModel
+                let mode: Veo31Request.GenerationMode?
+                let aspectRatio: String?
+                let seed: Int?
+                let callbackUrl: URL?
+                let enableTranslation: Bool?
+                let watermark: String?
+
+                enum CodingKeys: String, CodingKey {
+                    case prompt
+                    case imageUrls = "imageUrls"
+                    case model
+                    case mode
+                    case aspectRatio = "aspectRatio"
+                    case seed
+                    case callbackUrl = "callbackUrl"
+                    case enableTranslation = "enableTranslation"
+                    case watermark
+                }
+            }
+
+            init(from request: Veo31Request) {
+                self.model = "veo-3.1/" + (request.mode == .text2Video ? "text-to-video" : "image-to-video")
+                self.input = Veo31Input(
+                    prompt: request.prompt,
+                    imageUrls: request.imageUrls,
+                    model: request.model,
+                    mode: request.mode,
+                    aspectRatio: request.aspectRatio?.rawValue,
+                    seed: request.seed,
+                    callbackUrl: request.callbackUrl,
+                    enableTranslation: request.enableTranslation,
+                    watermark: request.watermark
+                )
+            }
+        }
+
+        let jobBody = JobRequestBody(from: request)
         let apiRequest = APIRequest(
-            path: "video/veo3/generate",
+            path: "jobs/createTask",
             method: .post,
-            body: request
+            body: jobBody
         )
 
         let response = try await apiClient.perform(apiRequest, as: Veo31Response.self)
