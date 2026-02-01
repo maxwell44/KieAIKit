@@ -156,7 +156,8 @@ extension VideoService {
 
     /// Generates a video using Veo 3.1 API.
     ///
-    /// This method uses the dedicated Veo 3.1 endpoint which supports:
+    /// This method uses the dedicated Veo 3.1 endpoint: /api/v1/veo/generate
+    /// Which supports:
     /// - Text-to-video (TEXT_2_VIDEO)
     /// - Image-to-video (FIRST_AND_LAST_FRAMES_2_VIDEO)
     /// - Reference-based generation (REFERENCE_2_VIDEO)
@@ -171,67 +172,51 @@ extension VideoService {
         timeout: TimeInterval = 600.0
     ) async throws -> VideoGenerationResult {
         print("🔍 [VideoService] Veo 3.1 Request:")
-        print("   Path: jobs/createTask")
-        print("   Model: veo-3.1/\(request.mode == .text2Video ? "text-to-video" : "image-to-video")")
+        print("   Path: veo/generate")
+        print("   Model: \(request.model.rawValue)")
+        print("   Mode: \(request.mode?.rawValue ?? "TEXT_2_VIDEO")")
         print("   Prompt: \(String(request.prompt.prefix(100)))...")
 
-        // Use standard job creation format
-        struct JobRequestBody: Codable {
+        // Veo 3.1专用接口请求格式
+        // See: https://docs.kie.ai/veo3-api/generate-veo-3-video
+        struct VeoRequestBody: Codable {
+            let prompt: String
             let model: String
-            let input: Veo31Input
+            let generationType: String
+            let aspectRatio: String?
+            let imageUrls: [URL]?
+            let seed: Int?
+            let enableTranslation: Bool?
+            let watermark: String?
 
-            struct Veo31Input: Codable {
-                let prompt: String
-                let imageUrls: [URL]?
-                let negativePrompt: String?
-                let duration: Int?
-                let aspectRatio: String?
-                let fps: Int?
-                let seed: Int?
-
-                enum CodingKeys: String, CodingKey {
-                    case prompt
-                    case imageUrls = "imageUrls"
-                    case negativePrompt = "negative_prompt"
-                    case duration
-                    case aspectRatio = "aspect_ratio"
-                    case fps
-                    case seed
-                }
+            enum CodingKeys: String, CodingKey {
+                case prompt
+                case model
+                case generationType = "generationType"
+                case aspectRatio = "aspect_ratio"
+                case imageUrls = "imageUrls"
+                case seed
+                case enableTranslation = "enableTranslation"
+                case watermark
             }
 
             init(from request: Veo31Request) {
-                // Use correct model identifier based on mode
-                let modelString: String
-                switch request.mode {
-                case .text2Video:
-                    modelString = "veo3/text-to-video"  // Veo 3 Fast text-to-video
-                case .firstAndLastFrames2Video:
-                    modelString = "veo3/image-to-video"  // Veo 3 image-to-video
-                case .reference2Video:
-                    modelString = "veo3_fast"  // Reference mode only supports fast
-                default:
-                    modelString = "veo3/text-to-video"
-                }
-
-                self.model = modelString
-                self.input = Veo31Input(
-                    prompt: request.prompt,
-                    imageUrls: request.imageUrls,
-                    negativePrompt: nil,
-                    duration: nil,
-                    aspectRatio: request.aspectRatio?.rawValue,
-                    fps: nil,
-                    seed: request.seed
-                )
+                self.prompt = request.prompt
+                self.model = request.model.rawValue  // veo3 or veo3_fast
+                self.generationType = request.mode?.rawValue ?? "TEXT_2_VIDEO"
+                self.aspectRatio = request.aspectRatio?.rawValue
+                self.imageUrls = request.imageUrls
+                self.seed = request.seed
+                self.enableTranslation = request.enableTranslation
+                self.watermark = request.watermark
             }
         }
 
-        let jobBody = JobRequestBody(from: request)
+        let veoBody = VeoRequestBody(from: request)
         let apiRequest = APIRequest(
-            path: "jobs/createTask",
+            path: "veo/generate",  // Veo 3.1 专用端点
             method: .post,
-            body: jobBody
+            body: veoBody
         )
 
         // Use standard task creation response
@@ -258,7 +243,7 @@ extension VideoService {
         return VideoGenerationResult(
             taskId: finalTaskInfo.id,
             videoURL: resultURL,
-            model: jobBody.model,
+            model: veoBody.model,
             prompt: request.prompt,
             duration: finalTaskInfo.metadata?["duration"] != nil ? Double(finalTaskInfo.metadata!["duration"]!) : nil,
             metadata: finalTaskInfo.metadata
