@@ -219,34 +219,28 @@ extension VideoService {
             body: veoBody
         )
 
-        // Use standard task creation response
-        let taskResponse = try await apiClient.performAndUnwrap(apiRequest, as: TaskCreationResponse.self)
+        // Use Veo 3.1 task creation response
+        let taskResponse = try await apiClient.performAndUnwrap(apiRequest, as: VeoTaskCreationResponse.self)
 
         print("✅ [VideoService] Task created: \(taskResponse.taskId)")
 
-        // Poll for completion
-        let finalTaskInfo = try await poller.poll(
+        // Poll for completion using Veo 3.1 specific endpoint
+        let result = try await pollVeo31Task(
             taskId: taskResponse.taskId,
-            endpoint: "jobs/recordInfo?taskId",
             interval: 2.0,
             timeout: timeout
         )
 
         print("✅ [VideoService] Task completed")
-        print("   Status: \(finalTaskInfo.status)")
-        print("   Result URL: \(finalTaskInfo.resultURL?.absoluteString ?? "nil")")
-
-        guard let resultURL = finalTaskInfo.resultURL else {
-            throw APIError.serverError("Task completed but no result URL provided")
-        }
+        print("   Video URL: \(result.videoURL)")
 
         return VideoGenerationResult(
-            taskId: finalTaskInfo.id,
-            videoURL: resultURL,
+            taskId: taskResponse.taskId,
+            videoURL: result.videoURL,
             model: veoBody.model,
             prompt: request.prompt,
-            duration: finalTaskInfo.metadata?["duration"] != nil ? Double(finalTaskInfo.metadata!["duration"]!) : nil,
-            metadata: finalTaskInfo.metadata
+            duration: nil,
+            metadata: nil
         )
     }
 
@@ -419,5 +413,112 @@ extension VideoService {
             duration: finalTaskInfo.metadata?["duration"] != nil ? Double(finalTaskInfo.metadata!["duration"]!) : nil,
             metadata: finalTaskInfo.metadata
         )
+    }
+}
+
+// MARK: - Veo 3.1 Specific Types and Methods
+
+extension VideoService {
+
+    /// Veo 3.1 task creation response.
+    struct VeoTaskCreationResponse: Codable, Sendable {
+        let taskId: String
+
+        enum CodingKeys: String, CodingKey {
+            case taskId = "task_id"
+        }
+    }
+
+    /// Veo 3.1 task status response.
+    struct VeoTaskStatusResponse: Codable, Sendable {
+        let code: Int
+        let msg: String
+        let data: VeoTaskData?
+
+        struct VeoTaskData: Codable, Sendable {
+            let successFlag: Int
+            let resultUrls: String?
+
+            enum CodingKeys: String, CodingKey {
+                case successFlag = "successFlag"
+                case resultUrls = "resultUrls"
+            }
+        }
+    }
+
+    /// Polls for Veo 3.1 task completion using the dedicated endpoint.
+    ///
+    /// - Parameters:
+    ///   - taskId: The task ID to poll
+    ///   - interval: Seconds between polling attempts
+    ///   - timeout: Maximum time to wait before timing out
+    /// - Returns: The video URL
+    /// - Throws: An APIError if polling fails or times out
+    private func pollVeo31Task(
+        taskId: String,
+        interval: TimeInterval,
+        timeout: TimeInterval
+    ) async throws -> VeoVideoResult {
+        let startTime = Date()
+        let endpoint = "veo/record-info?taskId=\(taskId)"
+
+        while Date().timeIntervalSince(startTime) < timeout {
+            // Create GET request for status check
+            struct EmptyBody: Codable {}
+            let request = APIRequest(path: endpoint, method: .get, body: EmptyBody())
+
+            do {
+                let response = try await apiClient.perform(request, as: VeoTaskStatusResponse.self)
+
+                if response.code == 200, let data = response.data {
+                    switch data.successFlag {
+                    case 0:
+                        // Still generating
+                        print("⏳ [VideoService] Veo 3.1 task still generating...")
+                        try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                        continue
+
+                    case 1:
+                        // Success - parse resultUrls
+                        guard let urlsJson = data.resultUrls,
+                              let urlsData = urlsJson.data(using: .utf8),
+                              let urls = try? JSONDecoder().decode([String].self, from: urlsData),
+                              let firstUrl = urls.first else {
+                            throw APIError.serverError("Task completed but no video URL found")
+                        }
+                        return VeoVideoResult(videoURL: URL(string: firstUrl)!)
+
+                    case 2, 3:
+                        // Failed
+                        throw APIError.serverError("Video generation failed: \(response.msg)")
+
+                    default:
+                        throw APIError.serverError("Unknown successFlag: \(data.successFlag)")
+                    }
+                } else if response.code == 422 {
+                    // Task not ready yet, keep polling
+                    print("⏳ [VideoService] Veo 3.1 task not ready...")
+                    try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                    continue
+                } else {
+                    throw APIError.serverError("Unexpected response: \(response.msg)")
+                }
+            } catch {
+                // If it's our error, throw it; otherwise continue polling
+                if let apiError = error as? APIError {
+                    throw apiError
+                }
+                // Network error, retry
+                print("⚠️ [VideoService] Poll error: \(error.localizedDescription)")
+                try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+            }
+        }
+
+        throw APIError.timeout("Task polling timed out after \(timeout) seconds")
+    }
+
+    /// Simple result type for Veo 3.1 video generation.
+    private struct VeoVideoResult {
+        let videoURL: URL
     }
 }
