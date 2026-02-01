@@ -170,8 +170,12 @@ extension VideoService {
         request: Veo31Request,
         timeout: TimeInterval = 600.0
     ) async throws -> VideoGenerationResult {
-        // Call Veo 3.1 using the standard jobs/createTask endpoint
-        // Transform Veo31Request to the job format
+        print("🔍 [VideoService] Veo 3.1 Request:")
+        print("   Path: jobs/createTask")
+        print("   Model: veo-3.1/\(request.mode == .text2Video ? "text-to-video" : "image-to-video")")
+        print("   Prompt: \(String(request.prompt.prefix(100)))...")
+
+        // Use standard job creation format
         struct JobRequestBody: Codable {
             let model: String
             let input: Veo31Input
@@ -179,24 +183,20 @@ extension VideoService {
             struct Veo31Input: Codable {
                 let prompt: String
                 let imageUrls: [URL]?
-                let model: Veo31Request.VeoModel
-                let mode: Veo31Request.GenerationMode?
+                let negativePrompt: String?
+                let duration: Int?
                 let aspectRatio: String?
+                let fps: Int?
                 let seed: Int?
-                let callbackUrl: URL?
-                let enableTranslation: Bool?
-                let watermark: String?
 
                 enum CodingKeys: String, CodingKey {
                     case prompt
                     case imageUrls = "imageUrls"
-                    case model
-                    case mode
-                    case aspectRatio = "aspectRatio"
+                    case negativePrompt = "negative_prompt"
+                    case duration
+                    case aspectRatio = "aspect_ratio"
+                    case fps
                     case seed
-                    case callbackUrl = "callbackUrl"
-                    case enableTranslation = "enableTranslation"
-                    case watermark
                 }
             }
 
@@ -205,13 +205,11 @@ extension VideoService {
                 self.input = Veo31Input(
                     prompt: request.prompt,
                     imageUrls: request.imageUrls,
-                    model: request.model,
-                    mode: request.mode,
+                    negativePrompt: nil,
+                    duration: nil,
                     aspectRatio: request.aspectRatio?.rawValue,
-                    seed: request.seed,
-                    callbackUrl: request.callbackUrl,
-                    enableTranslation: request.enableTranslation,
-                    watermark: request.watermark
+                    fps: nil,
+                    seed: request.seed
                 )
             }
         }
@@ -223,20 +221,36 @@ extension VideoService {
             body: jobBody
         )
 
-        // Debug: Print raw response
-        let response = try await apiClient.perform(apiRequest, as: Veo31Response.self)
+        // Use standard task creation response
+        let taskResponse = try await apiClient.performAndUnwrap(apiRequest, as: TaskCreationResponse.self)
 
-        // Print raw response for debugging
-        print("🧾 [VideoService] Veo 3.1 Response:")
-        print("   Code: \(response.code)")
-        print("   Message: \(response.message)")
-        if let data = response.data {
-            print("   Task ID: \(data.taskId)")
-            print("   Status: \(data.status ?? "nil")")
-            print("   Video URL: \(data.videoUrl?.absoluteString ?? "nil")")
-        } else {
-            print("   Data: nil")
+        print("✅ [VideoService] Task created: \(taskResponse.taskId)")
+
+        // Poll for completion
+        let finalTaskInfo = try await poller.poll(
+            taskId: taskResponse.taskId,
+            endpoint: "jobs/recordInfo?taskId",
+            interval: 2.0,
+            timeout: timeout
+        )
+
+        print("✅ [VideoService] Task completed")
+        print("   Status: \(finalTaskInfo.status)")
+        print("   Result URL: \(finalTaskInfo.resultURL?.absoluteString ?? "nil")")
+
+        guard let resultURL = finalTaskInfo.resultURL else {
+            throw APIError.serverError("Task completed but no result URL provided")
         }
+
+        return VideoGenerationResult(
+            taskId: finalTaskInfo.id,
+            videoURL: resultURL,
+            model: jobBody.model,
+            prompt: request.prompt,
+            duration: finalTaskInfo.metadata?["duration"] != nil ? Double(finalTaskInfo.metadata!["duration"]!) : nil,
+            metadata: finalTaskInfo.metadata
+        )
+    }
 
         // Check for immediate success or task creation
         guard response.isSuccess else {
