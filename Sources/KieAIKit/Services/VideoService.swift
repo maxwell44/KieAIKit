@@ -201,7 +201,20 @@ extension VideoService {
             }
 
             init(from request: Veo31Request) {
-                self.model = "veo-3.1/" + (request.mode == .text2Video ? "text-to-video" : "image-to-video")
+                // Use correct model identifier based on mode
+                let modelString: String
+                switch request.mode {
+                case .text2Video:
+                    modelString = "veo3/text-to-video"  // Veo 3 Fast text-to-video
+                case .firstAndLastFrames2Video:
+                    modelString = "veo3/image-to-video"  // Veo 3 image-to-video
+                case .reference2Video:
+                    modelString = "veo3_fast"  // Reference mode only supports fast
+                default:
+                    modelString = "veo3/text-to-video"
+                }
+
+                self.model = modelString
                 self.input = Veo31Input(
                     prompt: request.prompt,
                     imageUrls: request.imageUrls,
