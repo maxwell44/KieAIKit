@@ -514,7 +514,7 @@ extension VideoService {
             }
         }
 
-        throw APIError.timeout("Task polling timed out after \(timeout) seconds")
+        throw APIError.serverError("Task polling timed out after \(timeout) seconds")
     }
 
     /// Simple result type for Veo 3.1 video generation.
