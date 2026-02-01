@@ -252,50 +252,6 @@ extension VideoService {
         )
     }
 
-        // Check for immediate success or task creation
-        guard response.isSuccess else {
-            throw APIError.serverError("Veo 3.1 generation failed: \(response.message)")
-        }
-
-        guard let data = response.data else {
-            throw APIError.serverError("No data returned in Veo 3.1 response")
-        }
-
-        // If video URL is immediately available, return it
-        if let videoUrl = data.videoUrl {
-            return VideoGenerationResult(
-                taskId: data.taskId,
-                videoURL: videoUrl,
-                model: request.model.rawValue,
-                prompt: request.prompt,
-                duration: nil,
-                metadata: nil
-            )
-        }
-
-        // Otherwise, poll for task completion
-        let taskInfo = TaskInfo(id: data.taskId, status: .pending)
-        let finalTaskInfo = try await poller.poll(
-            taskId: taskInfo.id,
-            endpoint: "jobs/recordInfo?taskId",
-            interval: 2.0,
-            timeout: timeout
-        )
-
-        guard let resultURL = finalTaskInfo.resultURL else {
-            throw APIError.serverError("Task completed but no result URL provided")
-        }
-
-        return VideoGenerationResult(
-            taskId: finalTaskInfo.id,
-            videoURL: resultURL,
-            model: finalTaskInfo.model ?? request.model.rawValue,
-            prompt: request.prompt,
-            duration: finalTaskInfo.metadata?["duration"] != nil ? Double(finalTaskInfo.metadata!["duration"]!) : nil,
-            metadata: finalTaskInfo.metadata
-        )
-    }
-
     /// Generates a video using Veo 3.1 and waits for completion.
     ///
     /// Convenience method for text-to-video generation.
