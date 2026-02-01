@@ -150,6 +150,160 @@ public final class VideoService {
     }
 }
 
+// MARK: - Veo 3.1 Support
+
+extension VideoService {
+
+    /// Generates a video using Veo 3.1 API.
+    ///
+    /// This method uses the dedicated Veo 3.1 endpoint which supports:
+    /// - Text-to-video (TEXT_2_VIDEO)
+    /// - Image-to-video (FIRST_AND_LAST_FRAMES_2_VIDEO)
+    /// - Reference-based generation (REFERENCE_2_VIDEO)
+    ///
+    /// - Parameters:
+    ///   - request: The Veo 3.1 generation request
+    ///   - timeout: Maximum time to wait before timing out (default: 600 seconds)
+    /// - Returns: The video generation result
+    /// - Throws: An APIError if generation or polling fails
+    public func generateVeo31(
+        request: Veo31Request,
+        timeout: TimeInterval = 600.0
+    ) async throws -> VideoGenerationResult {
+        // Call Veo 3.1 endpoint
+        let apiRequest = APIRequest(
+            path: "api/v1/video/veo3/generate",
+            method: .post,
+            body: request
+        )
+
+        let response = try await apiClient.perform(apiRequest, as: Veo31Response.self)
+
+        // Check for immediate success or task creation
+        guard response.isSuccess else {
+            throw APIError.serverError("Veo 3.1 generation failed: \(response.message)")
+        }
+
+        guard let data = response.data else {
+            throw APIError.serverError("No data returned in Veo 3.1 response")
+        }
+
+        // If video URL is immediately available, return it
+        if let videoUrl = data.videoUrl {
+            return VideoGenerationResult(
+                taskId: data.taskId,
+                videoURL: videoUrl,
+                model: request.model.rawValue,
+                prompt: request.prompt,
+                duration: nil,
+                metadata: nil
+            )
+        }
+
+        // Otherwise, poll for task completion
+        let taskInfo = TaskInfo(id: data.taskId, status: .pending)
+        let finalTaskInfo = try await poller.poll(
+            taskId: taskInfo.id,
+            endpoint: "jobs/recordInfo?taskId",
+            interval: 2.0,
+            timeout: timeout
+        )
+
+        guard let resultURL = finalTaskInfo.resultURL else {
+            throw APIError.serverError("Task completed but no result URL provided")
+        }
+
+        return VideoGenerationResult(
+            taskId: finalTaskInfo.id,
+            videoURL: resultURL,
+            model: finalTaskInfo.model ?? request.model.rawValue,
+            prompt: request.prompt,
+            duration: finalTaskInfo.metadata?["duration"] != nil ? Double(finalTaskInfo.metadata!["duration"]!) : nil,
+            metadata: finalTaskInfo.metadata
+        )
+    }
+
+    /// Generates a video using Veo 3.1 and waits for completion.
+    ///
+    /// Convenience method for text-to-video generation.
+    ///
+    /// - Parameters:
+    ///   - prompt: Text prompt describing the video
+    ///   - model: Veo model variant (default: veo3_fast)
+    ///   - aspectRatio: Video aspect ratio (default: 16:9)
+    ///   - timeout: Maximum time to wait (default: 600 seconds)
+    /// - Returns: The video generation result
+    /// - Throws: An APIError if generation fails
+    public func generateVeo31TextToVideo(
+        prompt: String,
+        model: Veo31Request.VeoModel = .veo3_fast,
+        aspectRatio: Veo31Request.AspectRatio = .landscape,
+        timeout: TimeInterval = 600.0
+    ) async throws -> VideoGenerationResult {
+        let request = Veo31Request.textToVideo(
+            prompt: prompt,
+            model: model,
+            aspectRatio: aspectRatio
+        )
+        return try await generateVeo31(request: request, timeout: timeout)
+    }
+
+    /// Generates a video from an image using Veo 3.1.
+    ///
+    /// - Parameters:
+    ///   - prompt: Text prompt describing the video
+    ///   - imageUrl: URL of the reference image
+    ///   - model: Veo model variant (default: veo3_fast)
+    ///   - aspectRatio: Video aspect ratio (default: auto)
+    ///   - timeout: Maximum time to wait (default: 600 seconds)
+    /// - Returns: The video generation result
+    /// - Throws: An APIError if generation fails
+    public func generateVeo31ImageToVideo(
+        prompt: String,
+        imageUrl: URL,
+        model: Veo31Request.VeoModel = .veo3_fast,
+        aspectRatio: Veo31Request.AspectRatio = .auto,
+        timeout: TimeInterval = 600.0
+    ) async throws -> VideoGenerationResult {
+        let request = Veo31Request.imageToVideo(
+            prompt: prompt,
+            imageUrl: imageUrl,
+            model: model,
+            aspectRatio: aspectRatio
+        )
+        return try await generateVeo31(request: request, timeout: timeout)
+    }
+
+    /// Generates a video from first and last frames using Veo 3.1.
+    ///
+    /// - Parameters:
+    ///   - prompt: Text prompt describing the transition
+    ///   - firstFrameUrl: URL of the first frame
+    ///   - lastFrameUrl: URL of the last frame
+    ///   - model: Veo model variant (default: veo3_fast)
+    ///   - aspectRatio: Video aspect ratio (default: 16:9)
+    ///   - timeout: Maximum time to wait (default: 600 seconds)
+    /// - Returns: The video generation result
+    /// - Throws: An APIError if generation fails
+    public func generateVeo31FirstAndLastFrames(
+        prompt: String,
+        firstFrameUrl: URL,
+        lastFrameUrl: URL,
+        model: Veo31Request.VeoModel = .veo3_fast,
+        aspectRatio: Veo31Request.AspectRatio = .landscape,
+        timeout: TimeInterval = 600.0
+    ) async throws -> VideoGenerationResult {
+        let request = Veo31Request.firstAndLastFramesToVideo(
+            prompt: prompt,
+            firstFrameUrl: firstFrameUrl,
+            lastFrameUrl: lastFrameUrl,
+            model: model,
+            aspectRatio: aspectRatio
+        )
+        return try await generateVeo31(request: request, timeout: timeout)
+    }
+}
+
 // MARK: - Extensions for Custom Model Support
 
 extension VideoService {

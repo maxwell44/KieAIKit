@@ -152,6 +152,86 @@ public final class KieAIClient {
         return try await audio.generateAndWait(model: model, request: request, timeout: timeout)
     }
 
+    // MARK: - Veo 3.1 Convenience Methods
+
+    /// Generates a video using Veo 3.1 text-to-video.
+    ///
+    /// - Parameters:
+    ///   - prompt: The text prompt describing the video
+    ///   - useFastModel: Use veo3_fast instead of veo3 (default: true)
+    ///   - aspectRatio: Video aspect ratio (default: 16:9)
+    ///   - timeout: Maximum time to wait (default: 600 seconds)
+    /// - Returns: The video generation result
+    /// - Throws: An APIError if generation fails
+    public func generateVeo31TextToVideo(
+        prompt: String,
+        useFastModel: Bool = true,
+        aspectRatio: Veo31Request.AspectRatio = .landscape,
+        timeout: TimeInterval = 600.0
+    ) async throws -> VideoGenerationResult {
+        return try await video.generateVeo31TextToVideo(
+            prompt: prompt,
+            model: useFastModel ? .veo3_fast : .veo3,
+            aspectRatio: aspectRatio,
+            timeout: timeout
+        )
+    }
+
+    /// Generates a video from an image using Veo 3.1.
+    ///
+    /// - Parameters:
+    ///   - prompt: The text prompt describing the video
+    ///   - imageUrl: URL of the reference image
+    ///   - useFastModel: Use veo3_fast instead of veo3 (default: true)
+    ///   - aspectRatio: Video aspect ratio (default: auto)
+    ///   - timeout: Maximum time to wait (default: 600 seconds)
+    /// - Returns: The video generation result
+    /// - Throws: An APIError if generation fails
+    public func generateVeo31ImageToVideo(
+        prompt: String,
+        imageUrl: URL,
+        useFastModel: Bool = true,
+        aspectRatio: Veo31Request.AspectRatio = .auto,
+        timeout: TimeInterval = 600.0
+    ) async throws -> VideoGenerationResult {
+        return try await video.generateVeo31ImageToVideo(
+            prompt: prompt,
+            imageUrl: imageUrl,
+            model: useFastModel ? .veo3_fast : .veo3,
+            aspectRatio: aspectRatio,
+            timeout: timeout
+        )
+    }
+
+    /// Generates a video from first and last frames using Veo 3.1.
+    ///
+    /// - Parameters:
+    ///   - prompt: The text prompt describing the transition
+    ///   - firstFrameUrl: URL of the first frame
+    ///   - lastFrameUrl: URL of the last frame
+    ///   - useFastModel: Use veo3_fast instead of veo3 (default: true)
+    ///   - aspectRatio: Video aspect ratio (default: 16:9)
+    ///   - timeout: Maximum time to wait (default: 600 seconds)
+    /// - Returns: The video generation result
+    /// - Throws: An APIError if generation fails
+    public func generateVeo31FirstAndLastFrames(
+        prompt: String,
+        firstFrameUrl: URL,
+        lastFrameUrl: URL,
+        useFastModel: Bool = true,
+        aspectRatio: Veo31Request.AspectRatio = .landscape,
+        timeout: TimeInterval = 600.0
+    ) async throws -> VideoGenerationResult {
+        return try await video.generateVeo31FirstAndLastFrames(
+            prompt: prompt,
+            firstFrameUrl: firstFrameUrl,
+            lastFrameUrl: lastFrameUrl,
+            model: useFastModel ? .veo3_fast : .veo3,
+            aspectRatio: aspectRatio,
+            timeout: timeout
+        )
+    }
+
     // MARK: - File Upload Convenience
 
     /// Uploads image data and returns the URL.
