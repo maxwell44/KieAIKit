@@ -171,8 +171,9 @@ extension VideoService {
         timeout: TimeInterval = 600.0
     ) async throws -> VideoGenerationResult {
         // Call Veo 3.1 endpoint
+        // Note: path is relative to baseURL which already includes "/api/v1"
         let apiRequest = APIRequest(
-            path: "api/v1/video/veo3/generate",
+            path: "video/veo3/generate",
             method: .post,
             body: request
         )
