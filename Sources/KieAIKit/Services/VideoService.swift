@@ -511,8 +511,8 @@ extension VideoService {
             }
 
             struct VeoTaskInfo: Codable, Sendable {
-                let resultUrls: String?
-                let originUrls: String?
+                let resultUrls: [String]?  // Array of result URLs
+                let originUrls: [String]?  // Array of original URLs
                 let resolution: String?
             }
         }
@@ -633,10 +633,10 @@ extension VideoService {
             let response = try await apiClient.performAndUnwrap(detailsRequest, as: VideoURLResponse.self)
             print("📊 [VideoService] video-details response: code=\(response.code), msg=\(response.msg)")
 
-            // Parse: data.info.resultUrls contains the video URL
+            // Parse: data.info.resultUrls is an array, get first URL
             if let data = response.data,
                let info = data.info,
-               let urlStr = info.resultUrls,
+               let urlStr = info.resultUrls?.first,
                let url = URL(string: urlStr) {
                 print("✅ [VideoService] Got video URL from details: \(urlStr)")
                 if let resolution = info.resolution {
@@ -721,7 +721,7 @@ extension VideoService {
                     print("✅ [VideoService] Got 1080p video: \(urlStr)")
                     return url
                 }
-                if let info = data.info, let urlStr = info.resultUrls, let url = URL(string: urlStr) {
+                if let info = data.info, let urlStr = info.resultUrls?.first, let url = URL(string: urlStr) {
                     print("✅ [VideoService] Got video URL: \(urlStr)")
                     return url
                 }
@@ -766,8 +766,8 @@ extension VideoService {
     }
 
     private struct VideoInfo: Codable {
-        let resultUrls: String?  // This is the main video URL
-        let originUrls: String?
+        let resultUrls: [String]?  // Array of video URLs (use .first to get primary URL)
+        let originUrls: [String]?  // Array of original video URLs
         let resolution: String?
 
         enum CodingKeys: String, CodingKey {
