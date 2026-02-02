@@ -521,9 +521,8 @@ extension VideoService {
         let endpoint = "veo/record-info?taskId=\(taskId)"
 
         while Date().timeIntervalSince(startTime) < timeout {
-            // Create GET request for status check
-            struct EmptyBody: Codable {}
-            let request = APIRequest(path: endpoint, method: .get, body: EmptyBody())
+            // Create GET request for status check (no body for GET)
+            let request = APIRequest<EmptyRequestBody>(path: endpoint, method: .get)
 
             do {
                 let response = try await apiClient.perform(request, as: VeoTaskStatusResponse.self)
