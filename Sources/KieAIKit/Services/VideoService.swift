@@ -499,7 +499,7 @@ extension VideoService {
 
             enum CodingKeys: String, CodingKey {
                 case successFlag = "successFlag"
-                case resultUrls = "resultUrls"
+                case resultUrls = "result_urls"  // API returns snake_case
             }
         }
     }
