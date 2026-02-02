@@ -561,12 +561,33 @@ extension VideoService {
                     throw APIError.serverError("Unexpected response: \(response.msg)")
                 }
             } catch {
-                // If it's our error, throw it; otherwise continue polling
+                // Check if this is a fatal error that should stop polling
                 if let apiError = error as? APIError {
-                    throw apiError
+                    switch apiError {
+                    case .serverError(let message) where message.contains("Video generation failed"):
+                        // Actual generation failure - stop polling
+                        throw apiError
+                    case .serverError(let message) where message.contains("Task completed but no video URL"):
+                        // Completed but no URL - stop polling
+                        throw apiError
+                    case .serverError(let message) where message.contains("Unknown successFlag"):
+                        // Unknown state - stop polling
+                        throw apiError
+                    case .timeout:
+                        // Timeout - stop polling
+                        throw apiError
+                    case .unauthorized, .notFound, .badRequest:
+                        // Fatal errors - stop polling
+                        throw apiError
+                    default:
+                        // Temporary errors (serverError, networkError, rateLimited, etc.) - retry
+                        print("⚠️ [VideoService] Poll error (retrying): \(error.localizedDescription)")
+                        try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                        continue
+                    }
                 }
-                // Network error, retry
-                print("⚠️ [VideoService] Poll error: \(error.localizedDescription)")
+                // Non-API errors (network issues) - retry
+                print("⚠️ [VideoService] Poll error (retrying): \(error.localizedDescription)")
                 try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
             }
         }
