@@ -530,6 +530,7 @@ extension VideoService {
                 if response.code == 200, let data = response.data {
                     print("📊 [VideoService] successFlag: \(data.successFlag)")
                     print("📊 [VideoService] resultUrls: \(data.resultUrls ?? "nil")")
+                    print("📊 [VideoService] Full data: \(String(describing: data))")
 
                     switch data.successFlag {
                     case 0:
