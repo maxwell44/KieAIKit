@@ -528,6 +528,9 @@ extension VideoService {
                 let response = try await apiClient.perform(request, as: VeoTaskStatusResponse.self)
 
                 if response.code == 200, let data = response.data {
+                    print("📊 [VideoService] successFlag: \(data.successFlag)")
+                    print("📊 [VideoService] resultUrls: \(data.resultUrls ?? "nil")")
+
                     switch data.successFlag {
                     case 0:
                         // Still generating
@@ -537,12 +540,33 @@ extension VideoService {
 
                     case 1:
                         // Success - parse resultUrls
-                        guard let urlsJson = data.resultUrls,
-                              let urlsData = urlsJson.data(using: .utf8),
-                              let urls = try? JSONDecoder().decode([String].self, from: urlsData),
-                              let firstUrl = urls.first else {
+                        guard let urlsJson = data.resultUrls else {
+                            print("❌ [VideoService] resultUrls is nil")
                             throw APIError.serverError("Task completed but no video URL found")
                         }
+
+                        print("🔍 [VideoService] Parsing resultUrls JSON: \(urlsJson)")
+
+                        guard let urlsData = urlsJson.data(using: .utf8) else {
+                            print("❌ [VideoService] Failed to convert resultUrls to data")
+                            throw APIError.serverError("Failed to parse resultUrls")
+                        }
+
+                        print("🔍 [VideoService] URLs data: \(String(data: urlsData, encoding: .utf8) ?? "nil")")
+
+                        guard let urls = try? JSONDecoder().decode([String].self, from: urlsData) else {
+                            print("❌ [VideoService] Failed to decode URLs array")
+                            throw APIError.serverError("Failed to decode video URLs")
+                        }
+
+                        print("✅ [VideoService] Decoded \(urls.count) URLs: \(urls)")
+
+                        guard let firstUrl = urls.first else {
+                            print("❌ [VideoService] URLs array is empty")
+                            throw APIError.serverError("No video URLs found")
+                        }
+
+                        print("✅ [VideoService] First video URL: \(firstUrl)")
                         return URL(string: firstUrl)!
 
                     case 2, 3:
