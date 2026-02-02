@@ -668,21 +668,35 @@ extension VideoService {
         print("⚠️ [VideoService] 1080p endpoint failed after \(maxRetries) attempts, trying fallback...")
 
         // Fallback: try the standard get-video-details endpoint
+        // This returns the same structure as the callback
         let request2 = APIRequest<EmptyRequestBody>(
             path: "veo/video-details?taskId=\(taskId)",
             method: .get
         )
 
         let response2 = try await apiClient.performAndUnwrap(request2, as: VideoURLResponse.self)
-        if let urlStr = response2.videoUrl, let url = URL(string: urlStr) {
-            print("✅ [VideoService] Got video URL from details: \(urlStr)")
-            return url
-        } else if let data = response2.data, let urlStr = data.videoUrl, let url = URL(string: urlStr) {
-            print("✅ [VideoService] Got video URL (details nested): \(urlStr)")
+        print("📊 [VideoService] video-details response: code=\(response2.code), msg=\(response2.msg)")
+
+        // Parse according to the documented structure: data.info.resultUrls
+        if let data = response2.data,
+           let info = data.info,
+           let urlStr = info.resultUrls,
+           let url = URL(string: urlStr) {
+            print("✅ [VideoService] Got video URL from details.info.resultUrls: \(urlStr)")
+            if let resolution = info.resolution {
+                print("   Resolution: \(resolution)")
+            }
             return url
         }
 
-        throw APIError.serverError("Failed to get video URL from any endpoint")
+        // Also try to print the full response for debugging
+        if let data = response2.data {
+            print("⚠️ [VideoService] data.info.resultUrls is nil, data: \(String(describing: data))")
+        } else {
+            print("⚠️ [VideoService] response.data is nil")
+        }
+
+        throw APIError.serverError("Failed to get video URL from video-details endpoint")
     }
 
     /// Response for video URL endpoints.
@@ -690,10 +704,31 @@ extension VideoService {
         let code: Int
         let msg: String
         let data: VideoURLData?
-        let videoUrl: String?  // Direct field in response
     }
 
-    struct VideoURLData: Codable {
-        let videoUrl: String?
+    private struct VideoURLData: Codable {
+        let taskId: String?
+        let info: VideoInfo?
+        let fallbackFlag: Bool?
+        let videoUrl: String?  // Fallback direct field
+
+        enum CodingKeys: String, CodingKey {
+            case taskId = "task_id"
+            case info
+            case fallbackFlag = "fallbackFlag"
+            case videoUrl = "videoUrl"
+        }
+    }
+
+    private struct VideoInfo: Codable {
+        let resultUrls: String?  // This is the main video URL
+        let originUrls: String?
+        let resolution: String?
+
+        enum CodingKeys: String, CodingKey {
+            case resultUrls = "resultUrls"
+            case originUrls = "originUrls"
+            case resolution
+        }
     }
 }
