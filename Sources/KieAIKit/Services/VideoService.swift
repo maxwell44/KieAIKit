@@ -225,23 +225,85 @@ extension VideoService {
         print("✅ [VideoService] Task created: \(taskResponse.taskId)")
 
         // Poll for completion using Veo 3.1 specific endpoint
-        let result = try await pollVeo31Task(
+        let videoURL = try await pollVeo31Task(
             taskId: taskResponse.taskId,
             interval: 2.0,
             timeout: timeout
         )
 
         print("✅ [VideoService] Task completed")
-        print("   Video URL: \(result.videoURL)")
+        print("   Video URL: \(videoURL)")
 
         return VideoGenerationResult(
             taskId: taskResponse.taskId,
-            videoURL: result.videoURL,
+            videoURL: videoURL,
             model: veoBody.model,
             prompt: request.prompt,
             duration: nil,
             metadata: nil
         )
+    }
+
+    /// Creates a Veo 3.1 video generation task without waiting for completion.
+    ///
+    /// This method only creates the task and returns the task ID.
+    /// Use `pollVeo31Task` to check the status later.
+    ///
+    /// - Parameter request: The Veo 3.1 generation request
+    /// - Returns: The task ID for polling
+    /// - Throws: An APIError if task creation fails
+    public func createVeo31Task(request: Veo31Request) async throws -> String {
+        print("🔍 [VideoService] Creating Veo 3.1 Task:")
+        print("   Path: veo/generate")
+        print("   Model: \(request.model.rawValue)")
+        print("   Mode: \(request.mode?.rawValue ?? "TEXT_2_VIDEO")")
+        print("   Prompt: \(String(request.prompt.prefix(100)))...")
+
+        // Veo 3.1专用接口请求格式
+        struct VeoRequestBody: Codable {
+            let prompt: String
+            let model: String
+            let generationType: String
+            let aspectRatio: String?
+            let imageUrls: [URL]?
+            let seed: Int?
+            let enableTranslation: Bool?
+            let watermark: String?
+
+            enum CodingKeys: String, CodingKey {
+                case prompt
+                case model
+                case generationType = "generationType"
+                case aspectRatio = "aspect_ratio"
+                case imageUrls = "imageUrls"
+                case seed
+                case enableTranslation = "enableTranslation"
+                case watermark
+            }
+
+            init(from request: Veo31Request) {
+                self.prompt = request.prompt
+                self.model = request.model.rawValue
+                self.generationType = request.mode?.rawValue ?? "TEXT_2_VIDEO"
+                self.aspectRatio = request.aspectRatio?.rawValue
+                self.imageUrls = request.imageUrls
+                self.seed = request.seed
+                self.enableTranslation = request.enableTranslation
+                self.watermark = request.watermark
+            }
+        }
+
+        let veoBody = VeoRequestBody(from: request)
+        let apiRequest = APIRequest(
+            path: "veo/generate",
+            method: .post,
+            body: veoBody
+        )
+
+        let taskResponse = try await apiClient.performAndUnwrap(apiRequest, as: VeoTaskCreationResponse.self)
+
+        print("✅ [VideoService] Task created: \(taskResponse.taskId)")
+        return taskResponse.taskId
     }
 
     /// Generates a video using Veo 3.1 and waits for completion.
@@ -450,11 +512,11 @@ extension VideoService {
     ///   - timeout: Maximum time to wait before timing out
     /// - Returns: The video URL
     /// - Throws: An APIError if polling fails or times out
-    private func pollVeo31Task(
+    public func pollVeo31Task(
         taskId: String,
-        interval: TimeInterval,
-        timeout: TimeInterval
-    ) async throws -> VeoVideoResult {
+        interval: TimeInterval = 2.0,
+        timeout: TimeInterval = 600.0
+    ) async throws -> URL {
         let startTime = Date()
         let endpoint = "veo/record-info?taskId=\(taskId)"
 
@@ -482,7 +544,7 @@ extension VideoService {
                               let firstUrl = urls.first else {
                             throw APIError.serverError("Task completed but no video URL found")
                         }
-                        return VeoVideoResult(videoURL: URL(string: firstUrl)!)
+                        return URL(string: firstUrl)!
 
                     case 2, 3:
                         // Failed
@@ -511,10 +573,5 @@ extension VideoService {
         }
 
         throw APIError.serverError("Task polling timed out after \(timeout) seconds")
-    }
-
-    /// Simple result type for Veo 3.1 video generation.
-    private struct VeoVideoResult {
-        let videoURL: URL
     }
 }
