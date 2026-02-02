@@ -488,6 +488,7 @@ extension VideoService {
     }
 
     /// Veo 3.1 task status response.
+    /// API returns: {code: 200, msg: "success", data: {successFlag: 1, response: {...}}}
     struct VeoTaskStatusResponse: Codable, Sendable {
         let code: Int
         let msg: String
@@ -495,25 +496,27 @@ extension VideoService {
 
         struct VeoTaskData: Codable, Sendable {
             let successFlag: Int
-            let resultUrls: String?
-            let videoUrl: String?
-            let info: VeoTaskInfo?
             let taskId: String?
-            let fallbackFlag: Bool?
+            let response: VeoResponse?  // Contains the video URLs when successFlag=1
 
             enum CodingKeys: String, CodingKey {
                 case successFlag = "successFlag"
-                case resultUrls = "result_urls"
-                case videoUrl = "videoUrl"
-                case info
                 case taskId = "taskId"
-                case fallbackFlag = "fallbackFlag"
+                case response
             }
+        }
 
-            struct VeoTaskInfo: Codable, Sendable {
-                let resultUrls: [String]?  // Array of result URLs
-                let originUrls: [String]?  // Array of original URLs
-                let resolution: String?
+        struct VeoResponse: Codable, Sendable {
+            let taskId: String
+            let resultUrls: [String]  // Array of video URLs
+            let originUrls: [String]?  // Array of original URLs
+            let resolution: String?
+
+            enum CodingKeys: String, CodingKey {
+                case taskId = "taskId"
+                case resultUrls = "resultUrls"
+                case originUrls = "originUrls"
+                case resolution
             }
         }
     }
@@ -552,11 +555,21 @@ extension VideoService {
                         continue
 
                     case 1:
-                        // Success - need to fetch video URL separately
-                        print("✅ [VideoService] Task completed, fetching video URL...")
-                        let videoURL = try await fetchVideoURL(taskId: taskId)
-                        print("✅ [VideoService] Video URL: \(videoURL)")
-                        return videoURL
+                        // Success - extract video URL from response field
+                        print("✅ [VideoService] Task completed, extracting video URL...")
+                        guard let response = data.response,
+                              let urlStr = response.resultUrls.first,
+                              let url = URL(string: urlStr) else {
+                            throw APIError.serverError("Task completed but no video URL in response")
+                        }
+                        print("✅ [VideoService] Video URL: \(urlStr)")
+                        if let resolution = response.resolution {
+                            print("   Resolution: \(resolution)")
+                        }
+                        if response.originUrls != nil {
+                            print("   Original URLs available: \(response.originUrls!.count)")
+                        }
+                        return url
 
                     case 2, 3:
                         // Failed
