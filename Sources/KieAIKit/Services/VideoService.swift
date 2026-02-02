@@ -423,10 +423,6 @@ extension VideoService {
     /// Veo 3.1 task creation response.
     struct VeoTaskCreationResponse: Codable, Sendable {
         let taskId: String
-
-        enum CodingKeys: String, CodingKey {
-            case taskId = "task_id"
-        }
     }
 
     /// Veo 3.1 task status response.
