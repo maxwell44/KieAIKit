@@ -554,7 +554,7 @@ extension VideoService {
                     case 1:
                         // Success - need to fetch video URL separately
                         print("✅ [VideoService] Task completed, fetching video URL...")
-                        let videoURL = try await fetchVideoURL(taskId: taskResponse.taskId)
+                        let videoURL = try await fetchVideoURL(taskId: taskId)
                         print("✅ [VideoService] Video URL: \(videoURL)")
                         return videoURL
 
