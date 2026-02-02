@@ -646,14 +646,18 @@ extension VideoService {
                 }
 
                 // Check for successful response
+                // 1080p endpoint returns: {code: 200, data: {videoUrl: "..."}}
                 if response.code == 200, let data = response.data {
+                    // Try direct videoUrl field first
                     if let urlStr = data.videoUrl, let url = URL(string: urlStr) {
-                        print("✅ [VideoService] Got video URL (1080p): \(urlStr)")
+                        print("✅ [VideoService] Got video URL (1080p direct): \(urlStr)")
                         return url
                     }
-                } else if response.code == 200, let urlStr = response.videoUrl, let url = URL(string: urlStr) {
-                    print("✅ [VideoService] Got video URL (direct): \(urlStr)")
-                    return url
+                    // Try nested info.resultUrls as fallback
+                    if let info = data.info, let urlStr = info.resultUrls, let url = URL(string: urlStr) {
+                        print("✅ [VideoService] Got video URL (1080p nested): \(urlStr)")
+                        return url
+                    }
                 }
             } catch {
                 print("⚠️ [VideoService] get-1080p-video attempt \(attempt) failed: \(error)")
