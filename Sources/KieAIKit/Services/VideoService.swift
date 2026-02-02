@@ -496,10 +496,24 @@ extension VideoService {
         struct VeoTaskData: Codable, Sendable {
             let successFlag: Int
             let resultUrls: String?
+            let videoUrl: String?
+            let info: VeoTaskInfo?
+            let taskId: String?
+            let fallbackFlag: Bool?
 
             enum CodingKeys: String, CodingKey {
                 case successFlag = "successFlag"
-                case resultUrls = "result_urls"  // API returns snake_case
+                case resultUrls = "result_urls"
+                case videoUrl = "videoUrl"
+                case info
+                case taskId = "taskId"
+                case fallbackFlag = "fallbackFlag"
+            }
+
+            struct VeoTaskInfo: Codable, Sendable {
+                let resultUrls: String?
+                let originUrls: String?
+                let resolution: String?
             }
         }
     }
@@ -529,8 +543,6 @@ extension VideoService {
 
                 if response.code == 200, let data = response.data {
                     print("📊 [VideoService] successFlag: \(data.successFlag)")
-                    print("📊 [VideoService] resultUrls: \(data.resultUrls ?? "nil")")
-                    print("📊 [VideoService] Full data: \(String(describing: data))")
 
                     switch data.successFlag {
                     case 0:
@@ -540,34 +552,30 @@ extension VideoService {
                         continue
 
                     case 1:
-                        // Success - parse resultUrls
-                        guard let urlsJson = data.resultUrls else {
-                            print("❌ [VideoService] resultUrls is nil")
+                        // Success - get video URL from info.resultUrls
+                        let urlsJson: String
+                        if let info = data.info, let resultUrls = info.resultUrls {
+                            // Use callback-style response format
+                            urlsJson = resultUrls
+                            print("📊 [VideoService] Using info.resultUrls: \(urlsJson)")
+                        } else if let directUrls = data.resultUrls {
+                            // Use direct format
+                            urlsJson = directUrls
+                            print("📊 [VideoService] Using direct resultUrls: \(urlsJson)")
+                        } else {
+                            print("❌ [VideoService] No video URL found in response")
+                            print("📊 [VideoService] Full data: \(String(describing: data))")
                             throw APIError.serverError("Task completed but no video URL found")
                         }
 
-                        print("🔍 [VideoService] Parsing resultUrls JSON: \(urlsJson)")
-
-                        guard let urlsData = urlsJson.data(using: .utf8) else {
-                            print("❌ [VideoService] Failed to convert resultUrls to data")
-                            throw APIError.serverError("Failed to parse resultUrls")
+                        guard let urlsData = urlsJson.data(using: .utf8),
+                              let urls = try? JSONDecoder().decode([String].self, from: urlsData),
+                              let firstUrl = urls.first else {
+                            print("❌ [VideoService] Failed to parse video URLs from: \(urlsJson)")
+                            throw APIError.serverError("Failed to parse video URLs")
                         }
 
-                        print("🔍 [VideoService] URLs data: \(String(data: urlsData, encoding: .utf8) ?? "nil")")
-
-                        guard let urls = try? JSONDecoder().decode([String].self, from: urlsData) else {
-                            print("❌ [VideoService] Failed to decode URLs array")
-                            throw APIError.serverError("Failed to decode video URLs")
-                        }
-
-                        print("✅ [VideoService] Decoded \(urls.count) URLs: \(urls)")
-
-                        guard let firstUrl = urls.first else {
-                            print("❌ [VideoService] URLs array is empty")
-                            throw APIError.serverError("No video URLs found")
-                        }
-
-                        print("✅ [VideoService] First video URL: \(firstUrl)")
+                        print("✅ [VideoService] Video URL: \(firstUrl)")
                         return URL(string: firstUrl)!
 
                     case 2, 3:
