@@ -610,7 +610,9 @@ extension VideoService {
 
     /// Fetches the video URL for a completed task.
     ///
-    /// Retries the 1080p endpoint if the video is still being generated.
+    /// Strategy:
+    /// 1. First try video-details (base video should be ready after successFlag=1)
+    /// 2. Then try 1080p endpoint with retries (optional enhancement)
     ///
     /// - Parameter taskId: The task ID
     /// - Returns: The video URL
@@ -620,87 +622,126 @@ extension VideoService {
 
         struct EmptyBody: Codable {}
 
-        // Try get-1080p-video endpoint first with retries
-        // The API may return "being generated" even after successFlag=1
-        let maxRetries = 10
-        let retryInterval: TimeInterval = 3.0
-
-        for attempt in 1...maxRetries {
-            let request = APIRequest<EmptyRequestBody>(
-                path: "veo/get-1080p-video?taskId=\(taskId)",
-                method: .get
-            )
-
-            do {
-                let response = try await apiClient.perform(request, as: VideoURLResponse.self)
-
-                // Check if it's the "being generated" error
-                if response.code == 400,
-                   response.msg.contains("being generated") ||
-                   response.msg.contains("please try again later") {
-                    print("⏳ [VideoService] 1080p video still generating (attempt \(attempt)/\(maxRetries))...")
-                    if attempt < maxRetries {
-                        try await Task.sleep(nanoseconds: UInt64(retryInterval * 1_000_000_000))
-                        continue
-                    }
-                }
-
-                // Check for successful response
-                // 1080p endpoint returns: {code: 200, data: {videoUrl: "..."}}
-                if response.code == 200, let data = response.data {
-                    // Try direct videoUrl field first
-                    if let urlStr = data.videoUrl, let url = URL(string: urlStr) {
-                        print("✅ [VideoService] Got video URL (1080p direct): \(urlStr)")
-                        return url
-                    }
-                    // Try nested info.resultUrls as fallback
-                    if let info = data.info, let urlStr = info.resultUrls, let url = URL(string: urlStr) {
-                        print("✅ [VideoService] Got video URL (1080p nested): \(urlStr)")
-                        return url
-                    }
-                }
-            } catch {
-                print("⚠️ [VideoService] get-1080p-video attempt \(attempt) failed: \(error)")
-            }
-
-            // If not the last attempt and we got a retryable error, wait and retry
-            if attempt < maxRetries {
-                try await Task.sleep(nanoseconds: UInt64(retryInterval * 1_000_000_000))
-            }
-        }
-
-        print("⚠️ [VideoService] 1080p endpoint failed after \(maxRetries) attempts, trying fallback...")
-
-        // Fallback: try the standard get-video-details endpoint
-        // This returns the same structure as the callback
-        let request2 = APIRequest<EmptyRequestBody>(
+        // Step 1: Try video-details endpoint first (base video should be ready)
+        print("🔍 [VideoService] Trying video-details endpoint first...")
+        let detailsRequest = APIRequest<EmptyRequestBody>(
             path: "veo/video-details?taskId=\(taskId)",
             method: .get
         )
 
-        let response2 = try await apiClient.performAndUnwrap(request2, as: VideoURLResponse.self)
-        print("📊 [VideoService] video-details response: code=\(response2.code), msg=\(response2.msg)")
+        do {
+            let response = try await apiClient.performAndUnwrap(detailsRequest, as: VideoURLResponse.self)
+            print("📊 [VideoService] video-details response: code=\(response.code), msg=\(response.msg)")
 
-        // Parse according to the documented structure: data.info.resultUrls
-        if let data = response2.data,
-           let info = data.info,
-           let urlStr = info.resultUrls,
-           let url = URL(string: urlStr) {
-            print("✅ [VideoService] Got video URL from details.info.resultUrls: \(urlStr)")
-            if let resolution = info.resolution {
-                print("   Resolution: \(resolution)")
+            // Parse: data.info.resultUrls contains the video URL
+            if let data = response.data,
+               let info = data.info,
+               let urlStr = info.resultUrls,
+               let url = URL(string: urlStr) {
+                print("✅ [VideoService] Got video URL from details: \(urlStr)")
+                if let resolution = info.resolution {
+                    print("   Resolution: \(resolution)")
+                }
+                // Step 2: Try to upgrade to 1080p (non-blocking)
+                Task {
+                    await try? upgradeTo1080p(taskId: taskId)
+                }
+                return url
+            } else {
+                print("⚠️ [VideoService] video-details returned no URL, data: \(String(describing: response.data))")
             }
-            return url
+        } catch {
+            print("⚠️ [VideoService] video-details failed: \(error)")
         }
 
-        // Also try to print the full response for debugging
-        if let data = response2.data {
-            print("⚠️ [VideoService] data.info.resultUrls is nil, data: \(String(describing: data))")
-        } else {
-            print("⚠️ [VideoService] response.data is nil")
+        // Step 2: If video-details fails, try 1080p endpoint directly
+        print("🔍 [VideoService] Trying 1080p endpoint directly...")
+        return try await fetch1080pVideoDirectly(taskId: taskId)
+    }
+
+    /// Tries to upgrade to 1080p video (best-effort, doesn't affect main result)
+    private func upgradeTo1080p(taskId: String) async {
+        struct EmptyBody: Codable {}
+        let request = APIRequest<EmptyRequestBody>(
+            path: "veo/get-1080p-video?taskId=\(taskId)",
+            method: .get
+        )
+
+        let maxAttempts = 20
+        let retryInterval: TimeInterval = 5.0
+
+        for attempt in 1...maxAttempts {
+            do {
+                let response = try await apiClient.perform(request, as: VideoURLResponse.self)
+
+                if response.code == 200, let data = response.data,
+                   let urlStr = data.videoUrl, let url = URL(string: urlStr) {
+                    print("🎁 [VideoService] 1080p upgrade available: \(urlStr)")
+                    // Note: We can't update the returned URL here, but the user
+                    // could query again later to get the 1080p version
+                    return
+                }
+
+                if response.code == 400,
+                   (response.msg.contains("being generated") ||
+                    response.msg.contains("please try again later")) {
+                    print("⏳ [VideoService] 1080p upgrade still processing (attempt \(attempt)/\(maxAttempts))...")
+                    try await Task.sleep(nanoseconds: UInt64(retryInterval * 1_000_000_000))
+                    continue
+                }
+
+                // Other error, stop trying
+                return
+            } catch {
+                print("⚠️ [VideoService] 1080p upgrade attempt \(attempt) failed: \(error)")
+                if attempt < maxAttempts {
+                    try? await Task.sleep(nanoseconds: UInt64(retryInterval * 1_000_000_000))
+                }
+            }
+        }
+        print("⚠️ [VideoService] 1080p upgrade timed out after \(maxAttempts) attempts")
+    }
+
+    /// Fetches 1080p video directly (blocking)
+    private func fetch1080pVideoDirectly(taskId: String) async throws -> URL {
+        struct EmptyBody: Codable {}
+        let request = APIRequest<EmptyRequestBody>(
+            path: "veo/get-1080p-video?taskId=\(taskId)",
+            method: .get
+        )
+
+        let maxAttempts = 15
+        let retryInterval: TimeInterval = 4.0
+
+        for attempt in 1...maxAttempts {
+            let response = try await apiClient.perform(request, as: VideoURLResponse.self)
+
+            if response.code == 200, let data = response.data {
+                if let urlStr = data.videoUrl, let url = URL(string: urlStr) {
+                    print("✅ [VideoService] Got 1080p video: \(urlStr)")
+                    return url
+                }
+                if let info = data.info, let urlStr = info.resultUrls, let url = URL(string: urlStr) {
+                    print("✅ [VideoService] Got video URL: \(urlStr)")
+                    return url
+                }
+            }
+
+            if response.code == 400,
+               (response.msg.contains("being generated") ||
+                response.msg.contains("please try again later")) {
+                print("⏳ [VideoService] 1080p video still processing (attempt \(attempt)/\(maxAttempts))...")
+                if attempt < maxAttempts {
+                    try await Task.sleep(nanoseconds: UInt64(retryInterval * 1_000_000_000))
+                    continue
+                }
+            }
+
+            // Unexpected response
+            throw APIError.serverError("Unexpected 1080p response: \(response.msg)")
         }
 
-        throw APIError.serverError("Failed to get video URL from video-details endpoint")
+        throw APIError.serverError("1080p video timed out after \(maxAttempts * Int(retryInterval)) seconds")
     }
 
     /// Response for video URL endpoints.
