@@ -552,31 +552,11 @@ extension VideoService {
                         continue
 
                     case 1:
-                        // Success - get video URL from info.resultUrls
-                        let urlsJson: String
-                        if let info = data.info, let resultUrls = info.resultUrls {
-                            // Use callback-style response format
-                            urlsJson = resultUrls
-                            print("📊 [VideoService] Using info.resultUrls: \(urlsJson)")
-                        } else if let directUrls = data.resultUrls {
-                            // Use direct format
-                            urlsJson = directUrls
-                            print("📊 [VideoService] Using direct resultUrls: \(urlsJson)")
-                        } else {
-                            print("❌ [VideoService] No video URL found in response")
-                            print("📊 [VideoService] Full data: \(String(describing: data))")
-                            throw APIError.serverError("Task completed but no video URL found")
-                        }
-
-                        guard let urlsData = urlsJson.data(using: .utf8),
-                              let urls = try? JSONDecoder().decode([String].self, from: urlsData),
-                              let firstUrl = urls.first else {
-                            print("❌ [VideoService] Failed to parse video URLs from: \(urlsJson)")
-                            throw APIError.serverError("Failed to parse video URLs")
-                        }
-
-                        print("✅ [VideoService] Video URL: \(firstUrl)")
-                        return URL(string: firstUrl)!
+                        // Success - need to fetch video URL separately
+                        print("✅ [VideoService] Task completed, fetching video URL...")
+                        let videoURL = try await fetchVideoURL(taskId: taskResponse.taskId)
+                        print("✅ [VideoService] Video URL: \(videoURL)")
+                        return videoURL
 
                     case 2, 3:
                         // Failed
@@ -626,5 +606,64 @@ extension VideoService {
         }
 
         throw APIError.serverError("Task polling timed out after \(timeout) seconds")
+    }
+
+    /// Fetches the video URL for a completed task.
+    ///
+    /// - Parameter taskId: The task ID
+    /// - Returns: The video URL
+    /// - Throws: An APIError if fetching fails
+    private func fetchVideoURL(taskId: String) async throws -> URL {
+        print("📡 [VideoService] Fetching video URL for task: \(taskId)")
+
+        // Try get-1080p-video endpoint first
+        struct EmptyBody: Codable {}
+        let request = APIRequest<EmptyRequestBody>(
+            path: "veo/get-1080p-video?taskId=\(taskId)",
+            method: .get
+        )
+
+        do {
+            let response = try await apiClient.performAndUnwrap(request, as: VideoURLResponse.self)
+            // Try both direct field and nested data field
+            if let urlStr = response.videoUrl, let url = URL(string: urlStr) {
+                print("✅ [VideoService] Got video URL (direct): \(urlStr)")
+                return url
+            } else if let data = response.data, let urlStr = data.videoUrl, let url = URL(string: urlStr) {
+                print("✅ [VideoService] Got video URL (nested): \(urlStr)")
+                return url
+            }
+        } catch {
+            print("⚠️ [VideoService] get-1080p-video failed: \(error)")
+        }
+
+        // Fallback: try the standard get-video-details endpoint
+        let request2 = APIRequest<EmptyRequestBody>(
+            path: "veo/video-details?taskId=\(taskId)",
+            method: .get
+        )
+
+        let response2 = try await apiClient.performAndUnwrap(request2, as: VideoURLResponse.self)
+        if let urlStr = response2.videoUrl, let url = URL(string: urlStr) {
+            print("✅ [VideoService] Got video URL from details: \(urlStr)")
+            return url
+        } else if let data = response2.data, let urlStr = data.videoUrl, let url = URL(string: urlStr) {
+            print("✅ [VideoService] Got video URL (details nested): \(urlStr)")
+            return url
+        }
+
+        throw APIError.serverError("Failed to get video URL from any endpoint")
+    }
+
+    /// Response for video URL endpoints.
+    private struct VideoURLResponse: Codable {
+        let code: Int
+        let msg: String
+        let data: VideoURLData?
+        let videoUrl: String?  // Direct field in response
+    }
+
+    struct VideoURLData: Codable {
+        let videoUrl: String?
     }
 }
