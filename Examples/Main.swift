@@ -55,7 +55,7 @@ struct Main {
         )
 
         do {
-            let task = try await client.image.generate(model: .flux2, request: customRequest)
+            let task = try await client.image.generate(model: .flux2Flex, request: customRequest)
             print("✅ 任务已创建，ID: \(task.id)")
             print("   状态: \(task.status)")
 

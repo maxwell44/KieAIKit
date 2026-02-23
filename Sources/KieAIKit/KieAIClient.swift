@@ -328,18 +328,48 @@ extension KieAIClient {
         task: TaskInfo,
         timeout: TimeInterval = 300.0
     ) async throws -> T {
-        switch task.contentType {
+        let expectedTypeName: String
+        let expectedContentType: ContentType
+
+        if T.self == ImageGenerationResult.self {
+            expectedTypeName = "ImageGenerationResult"
+            expectedContentType = .image
+        } else if T.self == VideoGenerationResult.self {
+            expectedTypeName = "VideoGenerationResult"
+            expectedContentType = .video
+        } else if T.self == AudioGenerationResult.self {
+            expectedTypeName = "AudioGenerationResult"
+            expectedContentType = .audio
+        } else {
+            throw APIError.badRequest("Unsupported result type: \(T.self)")
+        }
+
+        if let actualType = task.contentType, actualType != expectedContentType {
+            throw APIError.resultTypeMismatch(
+                expected: expectedTypeName,
+                actual: String(describing: actualType)
+            )
+        }
+
+        switch expectedContentType {
         case .image:
             let result = try await image.waitForResult(task: task, timeout: timeout)
-            return result as! T
+            guard let typed = result as? T else {
+                throw APIError.resultTypeMismatch(expected: expectedTypeName, actual: "ImageGenerationResult")
+            }
+            return typed
         case .video:
             let result = try await video.waitForResult(task: task, timeout: timeout)
-            return result as! T
+            guard let typed = result as? T else {
+                throw APIError.resultTypeMismatch(expected: expectedTypeName, actual: "VideoGenerationResult")
+            }
+            return typed
         case .audio:
             let result = try await audio.waitForResult(task: task, timeout: timeout)
-            return result as! T
-        case .none:
-            throw APIError.unknown(NSError(domain: "KieAIKit", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unknown content type"]))
+            guard let typed = result as? T else {
+                throw APIError.resultTypeMismatch(expected: expectedTypeName, actual: "AudioGenerationResult")
+            }
+            return typed
         }
     }
 }

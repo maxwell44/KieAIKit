@@ -40,6 +40,9 @@ public enum APIError: Error, LocalizedError, CustomStringConvertible {
     /// The rate limit was exceeded.
     case rateLimited
 
+    /// The requested result type does not match the task content type.
+    case resultTypeMismatch(expected: String, actual: String?)
+
     /// Network connectivity issue.
     case networkError(Error)
 
@@ -71,6 +74,11 @@ public enum APIError: Error, LocalizedError, CustomStringConvertible {
             return "Resource not found"
         case .rateLimited:
             return "Rate limit exceeded"
+        case .resultTypeMismatch(let expected, let actual):
+            if let actual = actual {
+                return "Result type mismatch: expected \(expected), got \(actual)"
+            }
+            return "Result type mismatch: expected \(expected), but task content type is missing"
         case .networkError(let error):
             return "Network error: \(error.localizedDescription)"
         case .unknown(let error):
