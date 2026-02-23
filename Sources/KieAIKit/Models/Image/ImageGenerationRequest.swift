@@ -89,7 +89,8 @@ public struct ImageGenerationRequest: Codable, Sendable {
 }
 
 /// Type-erased wrapper for any Codable value.
-public struct AnyCodable: Codable, Sendable {
+/// Uses @unchecked for Sendable since the wrapped values are typically sendable types.
+public struct AnyCodable: Codable, @unchecked Sendable {
     private let value: Any
 
     public init(_ value: Any) {

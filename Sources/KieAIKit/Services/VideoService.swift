@@ -657,7 +657,7 @@ extension VideoService {
                 }
                 // Step 2: Try to upgrade to 1080p (non-blocking)
                 Task {
-                    await try? upgradeTo1080p(taskId: taskId)
+                    await upgradeTo1080p(taskId: taskId)
                 }
                 return url
             } else {
@@ -688,7 +688,7 @@ extension VideoService {
                 let response = try await apiClient.perform(request, as: VideoURLResponse.self)
 
                 if response.code == 200, let data = response.data,
-                   let urlStr = data.videoUrl, let url = URL(string: urlStr) {
+                   let urlStr = data.videoUrl, URL(string: urlStr) != nil {
                     print("🎁 [VideoService] 1080p upgrade available: \(urlStr)")
                     // Note: We can't update the returned URL here, but the user
                     // could query again later to get the 1080p version

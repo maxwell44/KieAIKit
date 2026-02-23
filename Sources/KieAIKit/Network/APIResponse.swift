@@ -17,7 +17,7 @@ import Foundation
 ///   "data": { ... }
 /// }
 /// ```
-public struct APIResponse<T: Decodable>: Decodable, Sendable {
+public struct APIResponse<T: Decodable & Sendable>: Decodable, Sendable {
 
     /// The response code (200 for success).
     public let code: Int

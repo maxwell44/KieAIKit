@@ -55,7 +55,7 @@ struct APIRequest<Body: Encodable> {
     /// - Returns: A URLRequest, or nil if the URL is invalid
     /// - Throws: An error if encoding fails
     func makeURLRequest(baseURL: String, apiKey: String) throws -> URLRequest {
-        guard let url = URL(string: baseURL) else {
+        guard URL(string: baseURL) != nil else {
             throw APIError.invalidURL(baseURL)
         }
 
