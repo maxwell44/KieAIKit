@@ -128,6 +128,47 @@ public final class KieAIClient {
         return try await video.generateAndWait(model: model, request: request, timeout: timeout)
     }
 
+    /// Creates a market video task with full dynamic input support.
+    ///
+    /// Use this for all KIE market video task types beyond the basic request model.
+    ///
+    /// - Parameters:
+    ///   - model: The strongly-typed KIE video model identifier.
+    ///   - input: Raw input payload matching the model's doc requirements.
+    ///   - callBackUrl: Optional callback URL for completion.
+    ///   - progressCallBackUrl: Optional callback URL for progress updates.
+    /// - Returns: The created task descriptor.
+    public func createVideoTask(
+        model: KieVideoModel,
+        input: [String: Any],
+        callBackUrl: URL? = nil,
+        progressCallBackUrl: URL? = nil
+    ) async throws -> TaskInfo {
+        return try await video.createTask(
+            model: model,
+            input: input,
+            callBackUrl: callBackUrl,
+            progressCallBackUrl: progressCallBackUrl
+        )
+    }
+
+    /// Creates and waits for a market video task with full dynamic input support.
+    public func createVideoTaskAndWait(
+        model: KieVideoModel,
+        input: [String: Any],
+        callBackUrl: URL? = nil,
+        progressCallBackUrl: URL? = nil,
+        timeout: TimeInterval = 600.0
+    ) async throws -> VideoGenerationResult {
+        return try await video.createTaskAndWait(
+            model: model,
+            input: input,
+            callBackUrl: callBackUrl,
+            progressCallBackUrl: progressCallBackUrl,
+            timeout: timeout
+        )
+    }
+
     /// Generates audio and waits for completion in one call.
     ///
     /// This is a convenience method that creates a request and waits for the result.

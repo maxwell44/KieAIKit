@@ -391,6 +391,115 @@ extension VideoService {
 
 extension VideoService {
 
+    /// Creates a video task using a strongly-typed KIE video model and dynamic input payload.
+    ///
+    /// This is the compatibility-safe entry point for full market video coverage.
+    ///
+    /// - Parameters:
+    ///   - model: The KIE video model identifier.
+    ///   - input: Raw input payload required by the selected model.
+    ///   - callBackUrl: Optional callback URL for task completion notification.
+    ///   - progressCallBackUrl: Optional callback URL for progress updates.
+    /// - Returns: A task descriptor for polling.
+    /// - Throws: APIError if request fails.
+    public func createTask(
+        model: KieVideoModel,
+        input: [String: Any],
+        callBackUrl: URL? = nil,
+        progressCallBackUrl: URL? = nil
+    ) async throws -> TaskInfo {
+        return try await createTask(
+            modelString: model.rawValue,
+            input: input,
+            callBackUrl: callBackUrl,
+            progressCallBackUrl: progressCallBackUrl
+        )
+    }
+
+    /// Creates a video task using a custom model string and dynamic input payload.
+    ///
+    /// - Parameters:
+    ///   - modelString: Raw model identifier from KIE market.
+    ///   - input: Raw input payload required by the selected model.
+    ///   - callBackUrl: Optional callback URL for task completion notification.
+    ///   - progressCallBackUrl: Optional callback URL for progress updates.
+    /// - Returns: A task descriptor for polling.
+    /// - Throws: APIError if request fails.
+    public func createTask(
+        modelString: String,
+        input: [String: Any],
+        callBackUrl: URL? = nil,
+        progressCallBackUrl: URL? = nil
+    ) async throws -> TaskInfo {
+        struct DynamicBody: Encodable {
+            let model: String
+            let input: [String: AnyCodable]
+            let callBackUrl: URL?
+            let progressCallBackUrl: URL?
+        }
+
+        let body = DynamicBody(
+            model: modelString,
+            input: input.mapValues { AnyCodable($0) },
+            callBackUrl: callBackUrl,
+            progressCallBackUrl: progressCallBackUrl
+        )
+
+        let apiRequest = APIRequest(
+            path: "jobs/createTask",
+            method: .post,
+            body: body
+        )
+
+        let taskResponse = try await apiClient.performAndUnwrap(apiRequest, as: TaskCreationResponse.self)
+        let taskInfo = TaskInfo(id: taskResponse.taskId, status: .pending)
+        try taskInfo.validate()
+        return taskInfo
+    }
+
+    /// Creates and waits for a video task using a strongly-typed model.
+    ///
+    /// - Parameters:
+    ///   - model: The KIE video model identifier.
+    ///   - input: Raw input payload required by the selected model.
+    ///   - callBackUrl: Optional callback URL for task completion notification.
+    ///   - progressCallBackUrl: Optional callback URL for progress updates.
+    ///   - timeout: Poll timeout.
+    /// - Returns: The generated video result.
+    /// - Throws: APIError if generation or polling fails.
+    public func createTaskAndWait(
+        model: KieVideoModel,
+        input: [String: Any],
+        callBackUrl: URL? = nil,
+        progressCallBackUrl: URL? = nil,
+        timeout: TimeInterval = 600.0
+    ) async throws -> VideoGenerationResult {
+        let task = try await createTask(
+            model: model,
+            input: input,
+            callBackUrl: callBackUrl,
+            progressCallBackUrl: progressCallBackUrl
+        )
+        return try await waitForResult(task: task, timeout: timeout)
+    }
+
+    /// Creates and waits for a video task using a raw model string.
+    public func createTaskAndWait(
+        modelString: String,
+        input: [String: Any],
+        callBackUrl: URL? = nil,
+        progressCallBackUrl: URL? = nil,
+        timeout: TimeInterval = 600.0
+    ) async throws -> VideoGenerationResult {
+        let task = try await createTask(
+            modelString: modelString,
+            input: input,
+            callBackUrl: callBackUrl,
+            progressCallBackUrl: progressCallBackUrl
+        )
+        return try await waitForResult(task: task, timeout: timeout)
+    }
+
     /// Generates a video using a custom model identifier string.
     ///
     /// Use this for models that are not yet in the KieModel enum.
