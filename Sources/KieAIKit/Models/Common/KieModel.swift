@@ -66,23 +66,25 @@ public enum KieModel: String, Codable, Sendable {
     /// Use `edit()` method with `ImageEditRequest` and `waitForResult()` to poll for completion.
     case googleNanoBananaEdit = "google/nano-banana-edit"
 
-    /// Nano Banana Pro - Advanced image-to-image generation (ASYNC TASK)
+    /// Nano Banana Pro - Image generation (text-to-image and image-to-image) (ASYNC TASK)
     /// Model identifier: "nano-banana-pro"
-    /// Documentation: https://kie.ai/nano-banana?model=nano-banana-pro
+    /// Documentation: https://docs.kie.ai/market/google/pro-image-to-image
     ///
-    /// This model creates an async task for advanced image editing with additional parameters.
-    /// Supports resolution control and aspect ratio customization.
+    /// This model supports both text-to-image and image-to-image generation.
+    /// - Text-to-image: use `NanoBananaProRequest.textToImage(prompt:)`
+    /// - Image-to-image: use `NanoBananaProRequest.imageToImage(prompt:imageURL:)`
+    /// Supports resolution control (1K/2K/4K), inpainting, and outpainting.
     /// Use `nanoBananaPro()` method with `NanoBananaProRequest` and `waitForResult()` to poll for completion.
     case nanoBananaPro = "nano-banana-pro"
 
-    /// Nano Banana Pro Text-to-Image - Text-to-image generation (ASYNC TASK)
-    /// Model identifier: "nano-banana-pro/text-to-image"
-    /// Documentation: https://kie.ai/nano-banana?model=nano-banana-pro
+    /// Nano Banana 2 - Image generation (text-to-image and image-to-image) (ASYNC TASK)
+    /// Model identifier: "nano-banana-2"
+    /// Documentation: https://docs.kie.ai/market/google/nanobanana2
     ///
-    /// This model creates an async task for text-to-image generation with advanced parameters.
-    /// Supports resolution control and aspect ratio customization.
-    /// Use `nanoBananaProTextToImage()` method with `NanoBananaProTextToImageRequest` and `waitForResult()` to poll for completion.
-    case nanoBananaProTextToImage = "nano-banana-pro/text-to-image"
+    /// Next-gen model combining Pro-level intelligence with fast generation.
+    /// Supports up to 14 reference images, search-grounded generation, and 4K output.
+    /// Use `nanoBanana2()` method with `NanoBanana2Request` and `waitForResult()` to poll for completion.
+    case nanoBanana2 = "nano-banana-2"
 
     /// Veo 3.1 Text-to-Video - Text-to-video generation (ASYNC TASK)
     /// Model identifier: "veo-3.1/text-to-video"
@@ -111,7 +113,7 @@ public enum KieModel: String, Codable, Sendable {
         switch self {
         case .gptImage15:
             return .immediate
-        case .flux2Flex, .kling26, .googleNanoBananaEdit, .nanoBananaPro, .nanoBananaProTextToImage, .veo31TextToVideo, .veo31ImageToVideo:
+        case .flux2Flex, .kling26, .googleNanoBananaEdit, .nanoBananaPro, .nanoBanana2, .veo31TextToVideo, .veo31ImageToVideo:
             return .asyncTask
         }
     }
@@ -120,7 +122,7 @@ public enum KieModel: String, Codable, Sendable {
 
     /// Returns all verified image generation models.
     public static var allImageModels: [KieModel] {
-        return [.gptImage15, .flux2Flex, .googleNanoBananaEdit, .nanoBananaPro, .nanoBananaProTextToImage]
+        return [.gptImage15, .flux2Flex, .googleNanoBananaEdit, .nanoBananaPro, .nanoBanana2]
     }
 
     /// Returns all verified video generation models.

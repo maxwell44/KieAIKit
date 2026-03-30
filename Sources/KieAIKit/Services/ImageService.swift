@@ -175,13 +175,13 @@ public final class ImageService {
         )
 
         // Build result from the completed task info
-        guard let resultURL = finalTaskInfo.resultURL else {
+        guard !finalTaskInfo.resultURLs.isEmpty else {
             throw APIError.serverError("Task completed but no result URL provided")
         }
 
         return ImageGenerationResult(
             taskId: finalTaskInfo.id,
-            imageUrls: [resultURL],
+            imageUrls: finalTaskInfo.resultURLs,
             model: finalTaskInfo.model ?? "unknown",
             prompt: "",  // Prompt not returned in task status
             width: nil,
@@ -324,17 +324,25 @@ public final class ImageService {
     ///
     /// - Parameters:
     ///   - request: The Nano Banana Pro request parameters
+    ///   - callBackUrl: Optional URL to receive task completion notifications
     /// - Returns: A TaskInfo containing the task ID
     /// - Throws: An APIError if the request fails
-    public func nanoBananaPro(request: NanoBananaProRequest) async throws -> TaskInfo {
+    public func nanoBananaPro(
+        request: NanoBananaProRequest,
+        callBackUrl: URL? = nil
+    ) async throws -> TaskInfo {
         // Build the request body for Nano Banana Pro
-        let input: [String: Any] = [
+        var input: [String: Any] = [
             "prompt": request.prompt,
             "aspect_ratio": request.aspectRatio,
             "resolution": request.resolution,
-            "output_format": request.outputFormat,
-            "image_input": request.imageInput.map { $0.absoluteString }
+            "output_format": request.outputFormat
         ]
+
+        // Only include image_input when provided (image-to-image mode)
+        if let imageInput = request.imageInput, !imageInput.isEmpty {
+            input["image_input"] = imageInput.map { $0.absoluteString }
+        }
 
         // Debug: Print the request body
         #if DEBUG
@@ -360,16 +368,19 @@ public final class ImageService {
         struct DynamicBody: Encodable {
             let model: String
             let input: [String: AnyCodable]
+            let callBackUrl: String?
 
-            init(model: String, input: [String: Any]) {
+            init(model: String, input: [String: Any], callBackUrl: String? = nil) {
                 self.model = model
                 self.input = input.mapValues { AnyCodable($0) }
+                self.callBackUrl = callBackUrl
             }
         }
 
         let body = DynamicBody(
             model: KieModel.nanoBananaPro.rawValue,
-            input: input
+            input: input,
+            callBackUrl: callBackUrl?.absoluteString
         )
 
         let apiRequest = APIRequest(
@@ -396,14 +407,122 @@ public final class ImageService {
     ///
     /// - Parameters:
     ///   - request: The Nano Banana Pro request parameters
+    ///   - callBackUrl: Optional URL to receive task completion notifications
     ///   - timeout: Maximum time to wait before timing out (default: 300 seconds)
     /// - Returns: The image generation result
     /// - Throws: An APIError if generation or polling fails
     public func nanoBananaProAndWait(
         request: NanoBananaProRequest,
+        callBackUrl: URL? = nil,
         timeout: TimeInterval = 300.0
     ) async throws -> ImageGenerationResult {
-        let task = try await nanoBananaPro(request: request)
+        let task = try await nanoBananaPro(request: request, callBackUrl: callBackUrl)
+        return try await waitForResult(task: task, timeout: timeout)
+    }
+
+    // MARK: - Nano Banana 2
+
+    /// Generates an image using Nano Banana 2 model.
+    ///
+    /// This method initiates an asynchronous image generation task and returns
+    /// immediately with a task ID. Use the returned task info with `waitForResult`
+    /// to poll for completion.
+    ///
+    /// - Parameters:
+    ///   - request: The Nano Banana 2 request parameters
+    ///   - callBackUrl: Optional URL to receive task completion notifications
+    /// - Returns: A TaskInfo containing the task ID
+    /// - Throws: An APIError if the request fails
+    public func nanoBanana2(
+        request: NanoBanana2Request,
+        callBackUrl: URL? = nil
+    ) async throws -> TaskInfo {
+        // Build the request body for Nano Banana 2
+        var input: [String: Any] = [
+            "prompt": request.prompt,
+            "aspect_ratio": request.aspectRatio,
+            "resolution": request.resolution,
+            "output_format": request.outputFormat
+        ]
+
+        // Only include image_input when provided (image-to-image mode)
+        if let imageInput = request.imageInput, !imageInput.isEmpty {
+            input["image_input"] = imageInput.map { $0.absoluteString }
+        }
+
+        // Debug: Print the request body
+        #if DEBUG
+        struct DebugBody: Encodable {
+            let model: String
+            let input: [String: AnyCodable]
+            init(model: String, input: [String: Any]) {
+                self.model = model
+                self.input = input.mapValues { AnyCodable($0) }
+            }
+        }
+        let debugBody = DebugBody(model: KieModel.nanoBanana2.rawValue, input: input)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .withoutEscapingSlashes
+        if let jsonData = try? encoder.encode(debugBody),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            print("🔍 KieAIKit Request Body:")
+            print(jsonString)
+        }
+        #endif
+
+        // Create request using AnyCodable
+        struct DynamicBody: Encodable {
+            let model: String
+            let input: [String: AnyCodable]
+            let callBackUrl: String?
+
+            init(model: String, input: [String: Any], callBackUrl: String? = nil) {
+                self.model = model
+                self.input = input.mapValues { AnyCodable($0) }
+                self.callBackUrl = callBackUrl
+            }
+        }
+
+        let body = DynamicBody(
+            model: KieModel.nanoBanana2.rawValue,
+            input: input,
+            callBackUrl: callBackUrl?.absoluteString
+        )
+
+        let apiRequest = APIRequest(
+            path: "jobs/createTask",
+            method: .post,
+            body: body
+        )
+
+        // The API returns a wrapped response with task ID
+        let taskResponse = try await apiClient.performAndUnwrap(apiRequest, as: TaskCreationResponse.self)
+
+        // Create a TaskInfo from the task ID
+        let taskInfo = TaskInfo(id: taskResponse.taskId, status: .pending)
+
+        // Validate the task info before returning
+        try taskInfo.validate()
+
+        return taskInfo
+    }
+
+    /// Generates an image using Nano Banana 2 and waits for completion.
+    ///
+    /// This is a convenience method that combines `nanoBanana2` and `waitForResult`.
+    ///
+    /// - Parameters:
+    ///   - request: The Nano Banana 2 request parameters
+    ///   - callBackUrl: Optional URL to receive task completion notifications
+    ///   - timeout: Maximum time to wait before timing out (default: 300 seconds)
+    /// - Returns: The image generation result
+    /// - Throws: An APIError if generation or polling fails
+    public func nanoBanana2AndWait(
+        request: NanoBanana2Request,
+        callBackUrl: URL? = nil,
+        timeout: TimeInterval = 300.0
+    ) async throws -> ImageGenerationResult {
+        let task = try await nanoBanana2(request: request, callBackUrl: callBackUrl)
         return try await waitForResult(task: task, timeout: timeout)
     }
 }

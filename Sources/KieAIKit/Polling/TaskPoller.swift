@@ -75,7 +75,8 @@ final class TaskPoller {
             } catch let apiError as APIError {
                 // For fatal errors, fail immediately
                 switch apiError {
-                case .notFound, .unauthorized, .badRequest, .timeout:
+                case .notFound, .unauthorized, .badRequest, .timeout,
+                     .insufficientCredits, .featureDisabled, .generationFailed:
                     throw apiError
                 case .requestFailed(let code, _):
                     // For 5xx errors, continue polling
@@ -84,8 +85,8 @@ final class TaskPoller {
                     } else {
                         throw apiError
                     }
-                case .serverError, .rateLimited:
-                    // For these, continue polling
+                case .serverError, .rateLimited, .serviceUnavailable:
+                    // Transient errors, continue polling
                     try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
                 default:
                     throw apiError

@@ -57,7 +57,6 @@ public struct ImageEditRequest: Codable, Sendable {
     public enum OutputFormat {
         public static let png = "png"
         public static let jpg = "jpg"
-        public static let webp = "webp"
     }
 
     /// Creates a request with a single image URL.

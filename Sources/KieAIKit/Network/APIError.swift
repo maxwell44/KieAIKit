@@ -40,6 +40,18 @@ public enum APIError: Error, LocalizedError, CustomStringConvertible {
     /// The rate limit was exceeded.
     case rateLimited
 
+    /// Insufficient credits in the account (HTTP 402).
+    case insufficientCredits
+
+    /// The content generation task failed on the server (HTTP 501).
+    case generationFailed(String)
+
+    /// The service is temporarily unavailable / maintenance (HTTP 455).
+    case serviceUnavailable
+
+    /// The requested feature is currently disabled (HTTP 505).
+    case featureDisabled
+
     /// The requested result type does not match the task content type.
     case resultTypeMismatch(expected: String, actual: String?)
 
@@ -74,6 +86,14 @@ public enum APIError: Error, LocalizedError, CustomStringConvertible {
             return "Resource not found"
         case .rateLimited:
             return "Rate limit exceeded"
+        case .insufficientCredits:
+            return "Insufficient credits: Please top up your account at kie.ai"
+        case .generationFailed(let message):
+            return "Generation failed: \(message)"
+        case .serviceUnavailable:
+            return "Service temporarily unavailable (maintenance)"
+        case .featureDisabled:
+            return "This feature is currently disabled"
         case .resultTypeMismatch(let expected, let actual):
             if let actual = actual {
                 return "Result type mismatch: expected \(expected), got \(actual)"
@@ -105,11 +125,21 @@ public enum APIError: Error, LocalizedError, CustomStringConvertible {
             return .badRequest(data.flatMap { String(data: $0, encoding: .utf8) } ?? "Invalid request")
         case 401:
             return .unauthorized
+        case 402:
+            return .insufficientCredits
         case 404:
             return .notFound
+        case 422:
+            return .badRequest(data.flatMap { String(data: $0, encoding: .utf8) } ?? "Validation error")
         case 429:
             return .rateLimited
-        case 500...599:
+        case 455:
+            return .serviceUnavailable
+        case 501:
+            return .generationFailed(data.flatMap { String(data: $0, encoding: .utf8) } ?? "Content generation failed")
+        case 505:
+            return .featureDisabled
+        case 500, 502...504, 506...599:
             return .serverError(data.flatMap { String(data: $0, encoding: .utf8) } ?? "Internal server error")
         default:
             return .requestFailed(response.statusCode, data)

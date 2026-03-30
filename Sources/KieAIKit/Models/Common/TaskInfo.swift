@@ -37,11 +37,17 @@ public struct TaskInfo: Codable, Sendable {
     /// Progress percentage (0-100) if available.
     public let progress: Int?
 
-    /// URL to the result when the task is complete.
-    public let resultURL: URL?
+    /// URLs to the results when the task is complete.
+    /// For image tasks, may contain multiple image URLs.
+    public let resultURLs: [URL]
 
     /// Additional metadata.
     public let metadata: [String: String]?
+
+    /// Returns the primary result URL (first in the array), or nil if empty.
+    public var resultURL: URL? {
+        return resultURLs.first
+    }
 
     private enum CodingKeys: String, CodingKey {
         case id = "taskId"     // API uses "taskId"
@@ -93,17 +99,17 @@ public struct TaskInfo: Codable, Sendable {
 
         progress = try container.decodeIfPresent(Int.self, forKey: .progress)
 
-        // Result URL - try to get from "resultJson" field
+        // Result URLs - try to get from "resultJson" field
         if let resultJson = try? container.decode(String.self, forKey: .resultJson),
            !resultJson.isEmpty,
            let data = resultJson.data(using: .utf8),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let resultUrls = json["resultUrls"] as? [String],
-           let urlString = resultUrls.first,
-           let url = URL(string: urlString) {
-            resultURL = url
+           let resultUrlStrings = json["resultUrls"] as? [String] {
+            resultURLs = resultUrlStrings.compactMap { URL(string: $0) }
+        } else if let singleURL = try? container.decodeIfPresent(URL.self, forKey: .resultURL) {
+            resultURLs = [singleURL]
         } else {
-            resultURL = try container.decodeIfPresent(URL.self, forKey: .resultURL)
+            resultURLs = []
         }
 
         metadata = try container.decodeIfPresent([String: String].self, forKey: .metadata)
@@ -118,7 +124,9 @@ public struct TaskInfo: Codable, Sendable {
         try container.encodeIfPresent(model, forKey: .model)
         try container.encodeIfPresent(errorMessage, forKey: .errorMessage)
         try container.encodeIfPresent(progress, forKey: .progress)
-        try container.encodeIfPresent(resultURL, forKey: .resultURL)
+        if !resultURLs.isEmpty {
+            try container.encode(resultURLs.first, forKey: .resultURL)
+        }
         try container.encodeIfPresent(metadata, forKey: .metadata)
     }
 
@@ -133,6 +141,7 @@ public struct TaskInfo: Codable, Sendable {
         errorMessage: String? = nil,
         progress: Int? = nil,
         resultURL: URL? = nil,
+        resultURLs: [URL]? = nil,
         metadata: [String: String]? = nil
     ) {
         self.id = id
@@ -144,7 +153,14 @@ public struct TaskInfo: Codable, Sendable {
         self.completedAt = completedAt
         self.errorMessage = errorMessage
         self.progress = progress
-        self.resultURL = resultURL
+        // Prefer explicit resultURLs; fall back to wrapping single resultURL
+        if let urls = resultURLs, !urls.isEmpty {
+            self.resultURLs = urls
+        } else if let url = resultURL {
+            self.resultURLs = [url]
+        } else {
+            self.resultURLs = []
+        }
         self.metadata = metadata
     }
 
