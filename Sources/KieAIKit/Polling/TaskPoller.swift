@@ -37,6 +37,9 @@ final class TaskPoller {
         let startTime = Date()
 
         while Date().timeIntervalSince(startTime) < timeout {
+            // 检查 Task 取消状态，立即抛出 CancellationError
+            try Task.checkCancellation()
+
             do {
                 // Build the path - if endpoint contains ?, append taskId as query param
                 let path: String
@@ -87,6 +90,8 @@ final class TaskPoller {
                 default:
                     throw apiError
                 }
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
                 // For decoding and other errors, continue polling
                 try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))

@@ -721,7 +721,10 @@ extension VideoService {
                         continue
                     }
                 }
-                // Non-API errors (network issues) - retry
+                // Non-API errors - check cancellation first
+                if error is CancellationError {
+                    throw error
+                }
                 print("⚠️ [VideoService] Poll error (retrying): \(error.localizedDescription)")
                 try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
             }
