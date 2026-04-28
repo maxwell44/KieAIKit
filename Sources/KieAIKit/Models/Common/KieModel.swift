@@ -44,6 +44,21 @@ public enum KieModel: String, Codable, Sendable {
     /// Results are returned immediately in the response.
     case gptImage15 = "gpt-image/1.5-text-to-image"
 
+    /// GPT Image 2 - Text-to-image generation (ASYNC TASK)
+    /// Model identifier: "gpt-image-2-text-to-image"
+    /// Documentation: https://docs.kie.ai/market/gpt/gpt-image-2-text-to-image
+    ///
+    /// This model creates an async task. Use `gptImage2()` or `waitForResult()` to poll for completion.
+    case gptImage2TextToImage = "gpt-image-2-text-to-image"
+
+    /// GPT Image 2 - Image-to-image generation (ASYNC TASK)
+    /// Model identifier: "gpt-image-2-image-to-image"
+    /// Documentation: https://docs.kie.ai/market/gpt/gpt-image-2-image-to-image
+    ///
+    /// This model creates an async task and requires source image URLs in `input_urls`.
+    /// Use `gptImage2()` or `gptImage2AndWait()` with `GPTImage2Request`.
+    case gptImage2ImageToImage = "gpt-image-2-image-to-image"
+
     /// Flux 2 - Text-to-image generation (ASYNC TASK)
     /// Model identifier: "flux-2/flex-text-to-image"
     /// Documentation: https://docs.kie.ai/market/flux2/flex-text-to-image
@@ -113,7 +128,7 @@ public enum KieModel: String, Codable, Sendable {
         switch self {
         case .gptImage15:
             return .immediate
-        case .flux2Flex, .kling26, .googleNanoBananaEdit, .nanoBananaPro, .nanoBanana2, .veo31TextToVideo, .veo31ImageToVideo:
+        case .gptImage2TextToImage, .gptImage2ImageToImage, .flux2Flex, .kling26, .googleNanoBananaEdit, .nanoBananaPro, .nanoBanana2, .veo31TextToVideo, .veo31ImageToVideo:
             return .asyncTask
         }
     }
@@ -122,7 +137,7 @@ public enum KieModel: String, Codable, Sendable {
 
     /// Returns all verified image generation models.
     public static var allImageModels: [KieModel] {
-        return [.gptImage15, .flux2Flex, .googleNanoBananaEdit, .nanoBananaPro, .nanoBanana2]
+        return [.gptImage15, .gptImage2TextToImage, .gptImage2ImageToImage, .flux2Flex, .googleNanoBananaEdit, .nanoBananaPro, .nanoBanana2]
     }
 
     /// Returns all verified video generation models.

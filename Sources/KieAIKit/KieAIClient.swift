@@ -104,6 +104,55 @@ public final class KieAIClient {
         return try await image.generateAndWait(model: model, request: request, timeout: timeout)
     }
 
+    /// Generates an image using GPT Image 2 text-to-image.
+    ///
+    /// - Parameters:
+    ///   - prompt: The text prompt describing the image
+    ///   - aspectRatio: Output aspect ratio (default: auto)
+    ///   - resolution: Optional output resolution: 1K, 2K, or 4K
+    ///   - timeout: Maximum time to wait before timing out (default: 300 seconds)
+    /// - Returns: The image generation result
+    /// - Throws: An APIError if generation fails
+    public func generateGptImage2(
+        prompt: String,
+        aspectRatio: String = GPTImage2Request.AspectRatio.auto,
+        resolution: String? = nil,
+        timeout: TimeInterval = 300.0
+    ) async throws -> ImageGenerationResult {
+        let request = GPTImage2Request.textToImage(
+            prompt: prompt,
+            aspectRatio: aspectRatio,
+            resolution: resolution
+        )
+        return try await image.gptImage2AndWait(request: request, timeout: timeout)
+    }
+
+    /// Edits or transforms images using GPT Image 2 image-to-image.
+    ///
+    /// - Parameters:
+    ///   - prompt: The text prompt describing the edit
+    ///   - imageURLs: Reference image URLs
+    ///   - aspectRatio: Output aspect ratio (default: auto)
+    ///   - resolution: Optional output resolution: 1K, 2K, or 4K
+    ///   - timeout: Maximum time to wait before timing out (default: 300 seconds)
+    /// - Returns: The image generation result
+    /// - Throws: An APIError if generation fails
+    public func editGptImage2(
+        prompt: String,
+        imageURLs: [URL],
+        aspectRatio: String = GPTImage2Request.AspectRatio.auto,
+        resolution: String? = nil,
+        timeout: TimeInterval = 300.0
+    ) async throws -> ImageGenerationResult {
+        let request = GPTImage2Request.imageToImage(
+            prompt: prompt,
+            imageURLs: imageURLs,
+            aspectRatio: aspectRatio,
+            resolution: resolution
+        )
+        return try await image.gptImage2AndWait(request: request, timeout: timeout)
+    }
+
     /// Generates a video and waits for completion in one call.
     ///
     /// This is a convenience method that creates a request and waits for the result.

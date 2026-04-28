@@ -314,6 +314,90 @@ public final class ImageService {
         return try await waitForResult(task: task, timeout: timeout)
     }
 
+    // MARK: - GPT Image 2
+
+    /// Generates or edits an image using GPT Image 2.
+    ///
+    /// This method automatically selects the correct KIE model identifier:
+    /// - `gpt-image-2-text-to-image` when `inputURLs` is empty or nil.
+    /// - `gpt-image-2-image-to-image` when reference image URLs are provided.
+    ///
+    /// - Parameters:
+    ///   - request: The GPT Image 2 request parameters
+    ///   - callBackUrl: Optional URL to receive task completion notifications
+    /// - Returns: A TaskInfo containing the task ID
+    /// - Throws: An APIError if the request fails
+    public func gptImage2(
+        request: GPTImage2Request,
+        callBackUrl: URL? = nil
+    ) async throws -> TaskInfo {
+        let inputURLs = request.inputURLs ?? []
+        let model: KieModel = inputURLs.isEmpty ? .gptImage2TextToImage : .gptImage2ImageToImage
+
+        var input: [String: Any] = [
+            "prompt": request.prompt,
+            "aspect_ratio": request.aspectRatio
+        ]
+
+        if !inputURLs.isEmpty {
+            input["input_urls"] = inputURLs.map { $0.absoluteString }
+        }
+        if let resolution = request.resolution {
+            input["resolution"] = resolution
+        }
+        if let nsfwChecker = request.nsfwChecker {
+            input["nsfw_checker"] = nsfwChecker
+        }
+
+        #if DEBUG
+        let debugBody: [String: Any] = [
+            "model": model.rawValue,
+            "input": input
+        ]
+        if let jsonData = try? JSONSerialization.data(withJSONObject: debugBody, options: [.withoutEscapingSlashes]),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            print("🔍 KieAIKit Request Body:")
+            print(jsonString)
+        }
+        #endif
+
+        var body: [String: AnyCodable] = [
+            "model": AnyCodable(model.rawValue),
+            "input": AnyCodable(input)
+        ]
+        if let callBackUrl = callBackUrl {
+            body["callBackUrl"] = AnyCodable(callBackUrl.absoluteString)
+        }
+
+        let apiRequest = APIRequest(
+            path: "jobs/createTask",
+            method: .post,
+            body: body
+        )
+
+        let taskResponse = try await apiClient.performAndUnwrap(apiRequest, as: TaskCreationResponse.self)
+        let taskInfo = TaskInfo(id: taskResponse.taskId, status: .pending)
+        try taskInfo.validate()
+        return taskInfo
+    }
+
+    /// Generates or edits an image using GPT Image 2 and waits for completion.
+    ///
+    /// - Parameters:
+    ///   - request: The GPT Image 2 request parameters
+    ///   - callBackUrl: Optional URL to receive task completion notifications
+    ///   - timeout: Maximum time to wait before timing out (default: 300 seconds)
+    /// - Returns: The image generation result
+    /// - Throws: An APIError if generation or polling fails
+    public func gptImage2AndWait(
+        request: GPTImage2Request,
+        callBackUrl: URL? = nil,
+        timeout: TimeInterval = 300.0
+    ) async throws -> ImageGenerationResult {
+        let task = try await gptImage2(request: request, callBackUrl: callBackUrl)
+        return try await waitForResult(task: task, timeout: timeout)
+    }
+
     // MARK: - Nano Banana Pro
 
     /// Generates an image using Nano Banana Pro model.

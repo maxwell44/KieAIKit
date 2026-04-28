@@ -26,9 +26,10 @@ let client = KieAIClient(apiKey: "你的Kie.ai_API密钥")
 ```swift
 // 方式1：简单调用
 do {
-    let result = try await client.generateImage(
-        model: .gptImage15,
-        prompt: "一只在雪地里奔跑的猫"
+    let result = try await client.generateGptImage2(
+        prompt: "一只在雪地里奔跑的猫",
+        aspectRatio: GPTImage2Request.AspectRatio.landscape,
+        resolution: GPTImage2Request.Resolution.r2K
     )
     print("图片URL: \(result.primaryImageURL!)")
 } catch {
@@ -36,14 +37,28 @@ do {
 }
 
 // 方式2：详细控制
-let request = ImageGenerationRequest.with(
+let request = GPTImage2Request.textToImage(
     prompt: "赛博朋克城市夜景",
-    size: .landscape,
-    negativePrompt: "模糊, 低质量"
+    aspectRatio: GPTImage2Request.AspectRatio.landscape,
+    resolution: GPTImage2Request.Resolution.r1K
 )
 
-let task = try await client.image.generate(model: .flux2, request: request)
+let task = try await client.image.gptImage2(request: request)
 let result = try await client.image.waitForResult(task: task)
+```
+
+### 使用 GPT Image 2 编辑图片
+```swift
+let imageURL = URL(string: "https://example.com/reference.png")!
+
+let result = try await client.editGptImage2(
+    prompt: "把这张产品图改成高级电商海报风格",
+    imageURLs: [imageURL],
+    aspectRatio: GPTImage2Request.AspectRatio.landscape,
+    resolution: GPTImage2Request.Resolution.r2K
+)
+
+print("编辑后图片URL: \(result.primaryImageURL!)")
 ```
 
 ### 生成视频
@@ -70,14 +85,17 @@ print("音频URL: \(result.audioURL)")
 
 ### 图片生成模型
 - `KieModel.gptImage15` - GPT Image 1.5
-- `KieModel.seedream45` - Seedream 4.5
-- `KieModel.flux2` - Flux 2
-- `KieModel.zImage` - Z-Image
+- `KieModel.gptImage2TextToImage` - GPT Image 2 文生图
+- `KieModel.gptImage2ImageToImage` - GPT Image 2 图生图/编辑
+- `KieModel.flux2Flex` - Flux 2 Flex
+- `KieModel.googleNanoBananaEdit` - Nano Banana Edit
+- `KieModel.nanoBananaPro` - Nano Banana Pro
+- `KieModel.nanoBanana2` - Nano Banana 2
 
 ### 视频生成模型
 - `KieModel.kling26` - Kling 2.6
-- `KieModel.wan26` - Wan 2.6
-- `KieModel.seedance15Pro` - Seedance 1.5 Pro
+- `KieModel.veo31TextToVideo` - Veo 3.1 文生视频
+- `KieModel.veo31ImageToVideo` - Veo 3.1 图生视频
 
 ## 4. 错误处理
 ```swift

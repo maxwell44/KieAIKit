@@ -35,10 +35,12 @@ final class KieAIKitTests: XCTestCase {
 
     func testKieModelRawValues() {
         XCTAssertEqual(KieModel.gptImage15.rawValue, "gpt-image/1.5-text-to-image")
+        XCTAssertEqual(KieModel.gptImage2TextToImage.rawValue, "gpt-image-2-text-to-image")
+        XCTAssertEqual(KieModel.gptImage2ImageToImage.rawValue, "gpt-image-2-image-to-image")
         XCTAssertEqual(KieModel.flux2Flex.rawValue, "flux-2/flex-text-to-image")
         XCTAssertEqual(KieModel.kling26.rawValue, "kling-2.6/text-to-video")
         XCTAssertEqual(KieModel.nanoBananaPro.rawValue, "nano-banana-pro")
-        XCTAssertEqual(KieModel.nanoBananaProTextToImage.rawValue, "nano-banana-pro/text-to-image")
+        XCTAssertEqual(KieModel.nanoBanana2.rawValue, "nano-banana-2")
         XCTAssertEqual(KieModel.veo31TextToVideo.rawValue, "veo-3.1/text-to-video")
         XCTAssertEqual(KieModel.veo31ImageToVideo.rawValue, "veo-3.1/image-to-video")
     }
@@ -46,9 +48,11 @@ final class KieAIKitTests: XCTestCase {
     func testKieModelCategories() {
         // Image models
         XCTAssertTrue(KieModel.allImageModels.contains(.gptImage15))
+        XCTAssertTrue(KieModel.allImageModels.contains(.gptImage2TextToImage))
+        XCTAssertTrue(KieModel.allImageModels.contains(.gptImage2ImageToImage))
         XCTAssertTrue(KieModel.allImageModels.contains(.flux2Flex))
         XCTAssertTrue(KieModel.allImageModels.contains(.nanoBananaPro))
-        XCTAssertTrue(KieModel.allImageModels.contains(.nanoBananaProTextToImage))
+        XCTAssertTrue(KieModel.allImageModels.contains(.nanoBanana2))
 
         // Video models
         XCTAssertTrue(KieModel.allVideoModels.contains(.kling26))
@@ -61,16 +65,18 @@ final class KieAIKitTests: XCTestCase {
         XCTAssertEqual(KieModel.gptImage15.executionType, .immediate)
 
         // Async task models
+        XCTAssertEqual(KieModel.gptImage2TextToImage.executionType, .asyncTask)
+        XCTAssertEqual(KieModel.gptImage2ImageToImage.executionType, .asyncTask)
         XCTAssertEqual(KieModel.flux2Flex.executionType, .asyncTask)
         XCTAssertEqual(KieModel.kling26.executionType, .asyncTask)
         XCTAssertEqual(KieModel.nanoBananaPro.executionType, .asyncTask)
-        XCTAssertEqual(KieModel.nanoBananaProTextToImage.executionType, .asyncTask)
+        XCTAssertEqual(KieModel.nanoBanana2.executionType, .asyncTask)
         XCTAssertEqual(KieModel.veo31TextToVideo.executionType, .asyncTask)
         XCTAssertEqual(KieModel.veo31ImageToVideo.executionType, .asyncTask)
     }
 
     func testKieModelCodable() {
-        let models: [KieModel] = [.veo31TextToVideo, .veo31ImageToVideo, .nanoBananaProTextToImage]
+        let models: [KieModel] = [.gptImage2TextToImage, .gptImage2ImageToImage, .veo31TextToVideo, .veo31ImageToVideo, .nanoBanana2]
         let encoder = JSONEncoder()
         let decoder = JSONDecoder()
 
@@ -122,6 +128,30 @@ final class KieAIKitTests: XCTestCase {
         XCTAssertEqual(request.width, 1920)
         XCTAssertEqual(request.height, 1080)
         XCTAssertEqual(request.negativePrompt, "blurry")
+    }
+
+    func testGPTImage2TextToImageRequestDefaults() {
+        let request = GPTImage2Request.textToImage(prompt: "A cinematic city poster")
+
+        XCTAssertEqual(request.prompt, "A cinematic city poster")
+        XCTAssertEqual(request.aspectRatio, GPTImage2Request.AspectRatio.auto)
+        XCTAssertNil(request.inputURLs)
+        XCTAssertNil(request.resolution)
+    }
+
+    func testGPTImage2ImageToImageRequest() {
+        let imageURL = URL(string: "https://example.com/reference.png")!
+        let request = GPTImage2Request.imageToImage(
+            prompt: "Make this product photo brighter",
+            imageURL: imageURL,
+            aspectRatio: GPTImage2Request.AspectRatio.landscape,
+            resolution: GPTImage2Request.Resolution.r2K
+        )
+
+        XCTAssertEqual(request.prompt, "Make this product photo brighter")
+        XCTAssertEqual(request.inputURLs, [imageURL])
+        XCTAssertEqual(request.aspectRatio, "16:9")
+        XCTAssertEqual(request.resolution, "2K")
     }
 
     func testVideoGenerationRequestDefaults() {

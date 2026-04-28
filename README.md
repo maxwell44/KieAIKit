@@ -56,10 +56,11 @@ let client = KieAIClient(apiKey: "YOUR_API_KEY")
 
 ```swift
 do {
-    // Simple image generation
-    let result = try await client.generateImage(
-        model: .gptImage15,
-        prompt: "A cyberpunk city at night, neon lights, rain"
+    // GPT Image 2 text-to-image
+    let result = try await client.generateGptImage2(
+        prompt: "A cyberpunk city at night, neon lights, rain",
+        aspectRatio: GPTImage2Request.AspectRatio.landscape,
+        resolution: GPTImage2Request.Resolution.r2K
     )
 
     print("Image URL: \(result.primaryImageURL!)")
@@ -67,6 +68,18 @@ do {
 } catch {
     print("Error: \(error)")
 }
+```
+
+For full control, use the image service directly:
+
+```swift
+let request = GPTImage2Request.textToImage(
+    prompt: "A cinematic night city poster with neon reflections on a rainy street.",
+    aspectRatio: GPTImage2Request.AspectRatio.auto
+)
+
+let task = try await client.image.gptImage2(request: request)
+let result = try await client.image.waitForResult(task: task)
 ```
 
 #### Video Generation
@@ -95,15 +108,11 @@ do {
     // Using remote image URL (recommended)
     let imageURL = URL(string: "https://example.com/image.jpg")!
 
-    let result = try await client.image.editAndWait(
-        model: .googleNanoBananaEdit,
-        request: ImageEditRequest.with(
-            prompt: "Change the background to a sunset beach",
-            imageURL: imageURL,
-            outputFormat: "png",
-            imageSize: "1:1"
-        ),
-        timeout: 300.0
+    let result = try await client.editGptImage2(
+        prompt: "Change the background to a sunset beach",
+        imageURLs: [imageURL],
+        aspectRatio: GPTImage2Request.AspectRatio.landscape,
+        resolution: GPTImage2Request.Resolution.r2K
     )
 
     print("Edited image URL: \(result.primaryImageURL!)")
@@ -233,14 +242,17 @@ let client = KieAIClient(configuration: config)
 
 ```swift
 KieModel.gptImage15      // "gpt-image/1.5-text-to-image" - Immediate response
+KieModel.gptImage2TextToImage  // "gpt-image-2-text-to-image" - Async task
 KieModel.flux2Flex       // "flux-2/flex-text-to-image" - Async task
 ```
 
 ##### Image-to-Image / Image Editing Models
 
 ```swift
+KieModel.gptImage2ImageToImage // "gpt-image-2-image-to-image" - GPT Image 2 editing
 KieModel.googleNanoBananaEdit  // "google/nano-banana-edit" - Basic image editing
 KieModel.nanoBananaPro         // "nano-banana-pro" - Advanced editing with resolution control
+KieModel.nanoBanana2           // "nano-banana-2" - Advanced generation and editing
 ```
 
 ##### Text-to-Video Models
@@ -254,9 +266,11 @@ KieModel.kling26         // "kling-2.6/text-to-video" - Async task
 | Model | Type | Features | Execution |
 |-------|------|----------|-----------|
 | GPT Image 1.5 | Text-to-Image | Fast generation | Immediate |
+| GPT Image 2 | Text-to-Image / Image-to-Image | Higher fidelity, text rendering, editing | Async |
 | Flux-2 Flex | Text-to-Image | High quality | Async |
 | Nano Banana Edit | Image-to-Image | Basic editing | Async |
 | Nano Banana Pro | Image-to-Image | Advanced editing, resolution control | Async |
+| Nano Banana 2 | Text-to-Image / Image-to-Image | Reference images, high resolution | Async |
 | Kling 2.6 | Text-to-Video | Video generation | Async |
 
 ### Detailed Request Configuration
@@ -280,17 +294,17 @@ let result = try await client.image.waitForResult(task: task, timeout: 300.0)
 Different models may require different input formats. The SDK handles this automatically:
 
 - **GPT Image 1.5**: Requires `aspect_ratio` (string) and `quality` (string)
+- **GPT Image 2**: Requires `prompt`, optional `input_urls`, `aspect_ratio`, `resolution`, `nsfw_checker`
 - **Flux-2**: Requires `aspect_ratio` (string) and `resolution` (string)
 - **Nano Banana Edit**: Requires `image_urls` and optional `output_format`, `image_size`
 - **Nano Banana Pro**: Requires `prompt`, `aspect_ratio`, `resolution`, `output_format`, `image_input`
 
 ```swift
-// GPT Image example
-let result1 = try await client.generateImage(
-    model: .gptImage15,
+// GPT Image 2 text-to-image example
+let result1 = try await client.generateGptImage2(
     prompt: "A beautiful landscape",
-    width: 1024,
-    height: 1024
+    aspectRatio: GPTImage2Request.AspectRatio.square,
+    resolution: GPTImage2Request.Resolution.r1K
 )
 
 // Flux-2 example
@@ -317,6 +331,16 @@ let result4 = try await client.image.nanoBananaProAndWait(
         imageURL: imageURL,
         aspectRatio: "16:9",
         resolution: "2K"
+    )
+)
+
+// GPT Image 2 image-to-image example
+let result5 = try await client.image.gptImage2AndWait(
+    request: GPTImage2Request.imageToImage(
+        prompt: "Turn this into a polished product hero image",
+        imageURL: imageURL,
+        aspectRatio: GPTImage2Request.AspectRatio.landscape,
+        resolution: GPTImage2Request.Resolution.r2K
     )
 )
 ```
